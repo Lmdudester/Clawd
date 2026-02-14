@@ -7,7 +7,7 @@ import type { ProjectFolder } from '@clawd/shared';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = resolve(__dirname, '../../../..');
-const storagePath = resolve(projectRoot, 'project-folders.json');
+const storagePath = process.env.PROJECT_FOLDERS_PATH || resolve(projectRoot, 'project-folders.json');
 
 export class ProjectFolderStore {
   private folders: ProjectFolder[] = [];
