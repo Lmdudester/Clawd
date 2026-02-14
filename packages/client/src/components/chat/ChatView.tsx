@@ -1,7 +1,7 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSessionStore } from '../../stores/sessionStore';
-import type { SessionMessage } from '@clawd/shared';
+import type { SessionMessage, SessionSettingsUpdate } from '@clawd/shared';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { api } from '../../lib/api';
 import { StatusBadge } from '../common/StatusBadge';
@@ -9,6 +9,7 @@ import { MessageList } from './MessageList';
 import { MessageInput } from '../input/MessageInput';
 import { ApprovalBanner } from '../input/ApprovalBanner';
 import { QuestionPanel } from '../input/QuestionPanel';
+import { SettingsDialog } from './SettingsDialog';
 
 const EMPTY_MESSAGES: SessionMessage[] = [];
 
@@ -60,6 +61,25 @@ export function ChatView() {
     send({ type: 'answer_question', sessionId: id, questionId, answers });
   }, [id, send]);
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const handleUpdateSettings = useCallback((settings: SessionSettingsUpdate) => {
+    if (!id) return;
+    send({ type: 'update_session_settings', sessionId: id, settings });
+  }, [id, send]);
+
+  const availableModels = useSessionStore((s) => s.availableModels);
+
+  const handleChangeModel = useCallback((model: string) => {
+    if (!id) return;
+    send({ type: 'set_model', sessionId: id, model });
+  }, [id, send]);
+
+  const handleRequestModels = useCallback(() => {
+    if (!id) return;
+    send({ type: 'get_models', sessionId: id });
+  }, [id, send]);
+
   // Collect streaming text for this session
   const streamingKey = Array.from(streamingTokens.keys()).find((k) => k.startsWith(`${id}:`));
   const streamingText = streamingKey ? streamingTokens.get(streamingKey) ?? '' : '';
@@ -85,10 +105,31 @@ export function ChatView() {
           {session && <StatusBadge status={session.status} />}
           <span className="text-sm text-slate-500 bg-blue-950/40 px-2 py-0.5 rounded truncate max-w-[200px]">{session?.cwd.split(/[/\\]/).filter(Boolean).pop()}</span>
         </div>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="text-slate-400 hover:text-white transition-colors border border-slate-700 rounded w-8 h-8 flex items-center justify-center shrink-0"
+          title="Session settings"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+            <path fillRule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 5A.75.75 0 0 1 2.75 9h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 9.75Zm0 5a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
+          </svg>
+        </button>
       </header>
 
       {/* Messages */}
       <MessageList messages={messages} streamingText={streamingText} />
+
+      {/* Permission mode status bar */}
+      {session?.permissionMode === 'auto_accept' && (
+        <div key="mode-auto" className="px-4 py-1.5 bg-purple-900/60 border-t border-purple-500/50 text-purple-200 text-xs font-medium text-center shrink-0">
+          Auto Accept — tools will be approved automatically
+        </div>
+      )}
+      {session?.permissionMode === 'plan' && (
+        <div key="mode-plan" className="px-4 py-1.5 bg-sky-900/60 border-t border-sky-500/50 text-sky-200 text-xs font-medium text-center shrink-0">
+          Plan Mode — tool use is disabled
+        </div>
+      )}
 
       {/* Input area - transforms based on state */}
       {pendingApproval && session?.status === 'awaiting_approval' ? (
@@ -97,6 +138,18 @@ export function ChatView() {
         <QuestionPanel question={pendingQuestion} onAnswer={handleAnswer} />
       ) : (
         <MessageInput onSend={handleSend} disabled={isInputDisabled} />
+      )}
+
+      {session && (
+        <SettingsDialog
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          session={session}
+          onUpdateSettings={handleUpdateSettings}
+          onChangeModel={handleChangeModel}
+          availableModels={availableModels}
+          onRequestModels={handleRequestModels}
+        />
       )}
     </div>
   );

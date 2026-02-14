@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SessionInfo, SessionMessage, PendingApproval, PendingQuestion } from '@clawd/shared';
+import type { SessionInfo, SessionMessage, PendingApproval, PendingQuestion, ModelInfo } from '@clawd/shared';
 
 interface SessionState {
   sessions: SessionInfo[];
@@ -8,6 +8,7 @@ interface SessionState {
   streamingTokens: Map<string, string>;
   pendingApproval: PendingApproval | null;
   pendingQuestion: PendingQuestion | null;
+  availableModels: ModelInfo[];
 
   setSessions: (sessions: SessionInfo[]) => void;
   updateSession: (session: SessionInfo) => void;
@@ -21,6 +22,7 @@ interface SessionState {
   clearSessionStreamTokens: (sessionId: string) => void;
   setPendingApproval: (approval: PendingApproval | null) => void;
   setPendingQuestion: (question: PendingQuestion | null) => void;
+  setAvailableModels: (models: ModelInfo[]) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -30,6 +32,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   streamingTokens: new Map(),
   pendingApproval: null,
   pendingQuestion: null,
+  availableModels: [],
 
   setSessions: (sessions) => set({ sessions }),
 
@@ -96,4 +99,5 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   setPendingApproval: (approval) => set({ pendingApproval: approval }),
   setPendingQuestion: (question) => set({ pendingQuestion: question }),
+  setAvailableModels: (models) => set({ availableModels: models }),
 }));

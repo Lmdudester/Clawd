@@ -30,6 +30,7 @@ export function useWebSocketProvider(): { send: SendFn } {
   const clearSessionStreamTokens = useSessionStore((s) => s.clearSessionStreamTokens);
   const setPendingApproval = useSessionStore((s) => s.setPendingApproval);
   const setPendingQuestion = useSessionStore((s) => s.setPendingQuestion);
+  const setAvailableModels = useSessionStore((s) => s.setAvailableModels);
 
   const connect = useCallback(() => {
     if (!token) return;
@@ -81,6 +82,9 @@ export function useWebSocketProvider(): { send: SendFn } {
           setPendingApproval(null);
           setPendingQuestion(null);
           break;
+        case 'models_list':
+          setAvailableModels(message.models);
+          break;
         case 'error':
           console.error(`Session ${message.sessionId} error:`, message.message);
           break;
@@ -100,7 +104,7 @@ export function useWebSocketProvider(): { send: SendFn } {
     ws.onerror = () => {
       ws.close();
     };
-  }, [token, logout, updateSession, addMessages, appendStreamToken, clearStreamTokens, clearSessionStreamTokens, setPendingApproval, setPendingQuestion]);
+  }, [token, logout, updateSession, addMessages, appendStreamToken, clearStreamTokens, clearSessionStreamTokens, setPendingApproval, setPendingQuestion, setAvailableModels]);
 
   useEffect(() => {
     connect();

@@ -1,5 +1,7 @@
 // Session and message types shared between server and client
 
+export type PermissionMode = 'normal' | 'auto_accept' | 'plan';
+
 export type SessionStatus =
   | 'idle'
   | 'running'
@@ -17,6 +19,8 @@ export interface SessionInfo {
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
   totalCostUsd: number;
+  permissionMode: PermissionMode;
+  model: string | null;
 }
 
 export interface SessionMessage {

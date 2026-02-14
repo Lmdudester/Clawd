@@ -105,6 +105,20 @@ export class MessageRouter {
       case 'interrupt':
         this.sessionManager.interruptSession(message.sessionId);
         break;
+
+      case 'update_session_settings':
+        this.sessionManager.updateSessionSettings(message.sessionId, message.settings);
+        break;
+
+      case 'get_models':
+        this.sessionManager.getSupportedModels(message.sessionId).then((models) => {
+          ws.send(JSON.stringify({ type: 'models_list', sessionId: message.sessionId, models }));
+        });
+        break;
+
+      case 'set_model':
+        this.sessionManager.setModel(message.sessionId, message.model);
+        break;
     }
   }
 }

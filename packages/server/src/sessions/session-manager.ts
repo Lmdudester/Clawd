@@ -1,4 +1,4 @@
-import { query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, type SDKMessage, type Query } from '@anthropic-ai/claude-agent-sdk';
 import { v4 as uuid } from 'uuid';
 import { MessageChannel } from './message-channel.js';
 import { windowsToContainer, containerToWindows } from '../path-translator.js';
@@ -8,6 +8,7 @@ import type {
   SessionStatus,
   PendingApproval,
   PendingQuestion,
+  SessionSettingsUpdate,
 } from '@clawd/shared';
 import type { CredentialStore } from '../settings/credential-store.js';
 
@@ -17,6 +18,7 @@ interface ManagedSession {
   channel: MessageChannel;
   abortController: AbortController;
   sdkSessionId: string | null;
+  queryStream: Query | null;
   pendingApproval: {
     approval: PendingApproval;
     resolve: (result: { behavior: 'allow' | 'deny'; message?: string }) => void;
@@ -25,6 +27,7 @@ interface ManagedSession {
     question: PendingQuestion;
     resolve: (answers: Record<string, string>) => void;
   } | null;
+  hasAssistantMessage: boolean;
 }
 
 type SessionEventHandler = (sessionId: string, event: string, data: unknown) => void;
@@ -74,6 +77,8 @@ export class SessionManager {
       lastMessageAt: null,
       lastMessagePreview: null,
       totalCostUsd: 0,
+      permissionMode: 'normal',
+      model: null,
     };
 
     const session: ManagedSession = {
@@ -82,8 +87,10 @@ export class SessionManager {
       channel,
       abortController,
       sdkSessionId: null,
+      queryStream: null,
       pendingApproval: null,
       pendingQuestion: null,
+      hasAssistantMessage: false,
     };
 
     this.sessions.set(id, session);
@@ -131,6 +138,8 @@ export class SessionManager {
         },
       });
 
+      session.queryStream = queryStream;
+
       for await (const message of queryStream) {
         this.handleSDKMessage(session, message);
       }
@@ -159,6 +168,16 @@ export class SessionManager {
     // Handle AskUserQuestion specially
     if (toolName === 'AskUserQuestion') {
       return this.handleAskUserQuestion(session, input);
+    }
+
+    // Permission mode checks
+    if (session.info.permissionMode === 'auto_accept') {
+      console.log(`[session:${session.info.id}] auto-approved: ${toolName}`);
+      return { behavior: 'allow', updatedInput: input };
+    }
+    if (session.info.permissionMode === 'plan') {
+      console.log(`[session:${session.info.id}] plan mode denied: ${toolName}`);
+      return { behavior: 'deny', message: 'Tool use denied — plan mode is active. Describe your plan instead.' };
     }
 
     const approvalId = uuid();
@@ -228,13 +247,21 @@ export class SessionManager {
       case 'system': {
         if (message.subtype === 'init') {
           session.sdkSessionId = message.session_id;
-          console.log(`[session:${session.info.id}] SDK initialized, sdk_session: ${message.session_id}`);
+          session.info.model = (message as any).model ?? null;
+          console.log(`[session:${session.info.id}] SDK initialized, sdk_session: ${message.session_id}, model: ${session.info.model}`);
           this.updateStatus(session, 'running');
         }
         break;
       }
 
       case 'assistant': {
+        // Extract the actual model from the API response
+        const responseModel = (message.message as any).model;
+        if (responseModel && responseModel !== session.info.model) {
+          session.info.model = responseModel;
+          this.emit(session.info.id, 'session_update', session.info);
+        }
+
         const textBlocks = message.message.content.filter(
           (b: any) => b.type === 'text'
         );
@@ -244,6 +271,7 @@ export class SessionManager {
 
         for (const block of textBlocks) {
           if ((block as any).text) {
+            session.hasAssistantMessage = true;
             this.addMessage(session, {
               id: message.uuid || uuid(),
               sessionId: session.info.id,
@@ -306,9 +334,23 @@ export class SessionManager {
         console.log(
           `[session:${session.info.id}] result: ${isError ? 'ERROR' : 'ok'}, cost: $${(result.total_cost_usd ?? 0).toFixed(4)}`
         );
+
+        // Surface command result text when no assistant messages were emitted this turn
+        // (e.g. slash commands like /help, /model, /cost)
+        const resultText = result.result ?? '';
+        if (resultText && !session.hasAssistantMessage) {
+          this.addMessage(session, {
+            id: uuid(),
+            sessionId: session.info.id,
+            type: 'system',
+            content: resultText,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
         this.updateStatus(session, 'idle');
         this.emit(session.info.id, 'result', {
-          result: result.result ?? '',
+          result: resultText,
           costUsd: result.total_cost_usd ?? 0,
           isError,
         });
@@ -328,6 +370,8 @@ export class SessionManager {
       content,
       timestamp: new Date().toISOString(),
     });
+
+    session.hasAssistantMessage = false;
 
     session.channel.push({
       type: 'user',
@@ -360,6 +404,60 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     session.abortController.abort();
+  }
+
+  async getSupportedModels(sessionId: string): Promise<{ value: string; displayName: string; description: string }[]> {
+    const session = this.sessions.get(sessionId);
+    if (!session?.queryStream) return [];
+    try {
+      const models = await session.queryStream.supportedModels();
+      console.log(`[session:${sessionId}] supportedModels:`, JSON.stringify(models));
+      return models;
+    } catch (err) {
+      console.error(`[session:${sessionId}] failed to get supported models:`, err);
+      return [];
+    }
+  }
+
+  async setModel(sessionId: string, model: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session?.queryStream) return;
+    try {
+      await session.queryStream.setModel(model);
+      session.info.model = model;
+      console.log(`[session:${sessionId}] model changed to: ${model}`);
+      this.emit(sessionId, 'session_update', session.info);
+      this.addMessage(session, {
+        id: uuid(),
+        sessionId,
+        type: 'system',
+        content: `Model changed to ${model}`,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error(`[session:${sessionId}] failed to set model:`, err);
+      this.addMessage(session, {
+        id: uuid(),
+        sessionId,
+        type: 'error',
+        content: `Failed to change model: ${err.message || 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  updateSessionSettings(sessionId: string, settings: SessionSettingsUpdate): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    if (settings.name !== undefined) {
+      session.info.name = settings.name;
+    }
+    if (settings.permissionMode !== undefined) {
+      session.info.permissionMode = settings.permissionMode;
+    }
+
+    this.emit(sessionId, 'session_update', session.info);
   }
 
   terminateSession(sessionId: string): void {

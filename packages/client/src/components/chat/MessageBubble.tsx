@@ -22,8 +22,8 @@ export function MessageBubble({ message }: { message: SessionMessage }) {
 
   if (message.type === 'system') {
     return (
-      <div className="mx-4 my-2 text-center text-xs text-slate-500">
-        {message.content}
+      <div className="mx-4 my-2 px-4 py-2.5 bg-slate-800/50 border border-slate-700/40 rounded-lg text-sm text-slate-300">
+        <MarkdownRenderer content={message.content} />
       </div>
     );
   }
