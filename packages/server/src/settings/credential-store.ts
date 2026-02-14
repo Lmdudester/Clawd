@@ -1,0 +1,166 @@
+import { readFileSync, writeFileSync, unlinkSync, symlinkSync, existsSync, readdirSync, mkdirSync } from 'fs';
+import { join, resolve } from 'path';
+import { config } from '../config.js';
+import type { AuthStatusResponse } from '@clawd/shared';
+
+interface StoredAuth {
+  claudeDir: string;
+}
+
+export class CredentialStore {
+  private storedAuth: StoredAuth | null = null;
+
+  constructor() {
+    this.load();
+  }
+
+  private load(): void {
+    try {
+      const raw = readFileSync(config.claudeAuthPath, 'utf-8');
+      this.storedAuth = JSON.parse(raw);
+    } catch {
+      this.storedAuth = null;
+    }
+  }
+
+  private save(): void {
+    if (this.storedAuth) {
+      writeFileSync(config.claudeAuthPath, JSON.stringify(this.storedAuth, null, 2));
+    } else {
+      try { unlinkSync(config.claudeAuthPath); } catch {}
+    }
+  }
+
+  // Scan for .credentials.json files in likely locations.
+  discoverCredentialFiles(): string[] {
+    const paths: string[] = [];
+
+    if (config.hostDrivePrefix) {
+      // Docker: scan mounted drive
+      const usersDir = join(config.hostDrivePrefix, 'Users');
+      try {
+        const users = readdirSync(usersDir);
+        for (const user of users) {
+          const claudeDir = join(usersDir, user, '.claude');
+          const credFile = join(claudeDir, '.credentials.json');
+          if (existsSync(credFile)) {
+            paths.push(claudeDir);
+          }
+        }
+      } catch {}
+    } else {
+      // Local dev: check home directory
+      const home = process.env.HOME || process.env.USERPROFILE || '';
+      if (home) {
+        const claudeDir = join(home, '.claude');
+        const credFile = join(claudeDir, '.credentials.json');
+        if (existsSync(credFile)) {
+          paths.push(claudeDir);
+        }
+      }
+    }
+
+    return paths;
+  }
+
+  // Store the selected .claude directory path and set up symlink (Docker only).
+  setCredentialsPath(claudeDir: string): void {
+    const credFile = join(claudeDir, '.credentials.json');
+    if (!existsSync(credFile)) {
+      throw new Error(`Credentials file not found: ${credFile}`);
+    }
+
+    this.storedAuth = { claudeDir };
+    this.save();
+
+    // In Docker, symlink /root/.claude/.credentials.json -> the mounted path
+    if (config.hostDrivePrefix) {
+      this.setupSymlink(claudeDir);
+    }
+  }
+
+  private setupSymlink(claudeDir: string): void {
+    const targetFile = join(claudeDir, '.credentials.json');
+    const rootClaudeDir = '/root/.claude';
+    const symlinkPath = join(rootClaudeDir, '.credentials.json');
+
+    // Ensure /root/.claude exists
+    mkdirSync(rootClaudeDir, { recursive: true });
+
+    // Ensure onboarding is bypassed
+    const dotClaudeJson = '/root/.claude.json';
+    if (!existsSync(dotClaudeJson)) {
+      writeFileSync(dotClaudeJson, JSON.stringify({ hasCompletedOnboarding: true }));
+    }
+
+    // Remove existing symlink/file if present
+    try { unlinkSync(symlinkPath); } catch {}
+
+    // Create symlink
+    symlinkSync(targetFile, symlinkPath);
+    console.log(`Symlinked ${symlinkPath} -> ${targetFile}`);
+  }
+
+  // Get env overrides for SDK sessions.
+  // When OAuth is configured, remove ANTHROPIC_API_KEY so the CLI uses the credentials file.
+  getEnvOverrides(): Record<string, string | undefined> {
+    if (this.storedAuth) {
+      // Remove the API key so CLI falls through to credentials file
+      return { ANTHROPIC_API_KEY: undefined };
+    }
+    return {};
+  }
+
+  // Get current auth status for display.
+  getStatus(): AuthStatusResponse {
+    const hasEnvFallback = !!process.env.ANTHROPIC_API_KEY;
+
+    if (this.storedAuth) {
+      const credFile = join(this.storedAuth.claudeDir, '.credentials.json');
+      let maskedToken: string | null = null;
+
+      try {
+        const raw = readFileSync(credFile, 'utf-8');
+        const creds = JSON.parse(raw);
+        // The credentials file typically has an accessToken or oauth_token
+        const token = creds.claudeAiOauth?.accessToken || creds.accessToken || '';
+        if (token) {
+          maskedToken = token.slice(0, 8) + '...' + token.slice(-4);
+        }
+      } catch {}
+
+      return {
+        method: 'oauth_credentials_file',
+        credentialsPath: this.storedAuth.claudeDir,
+        maskedToken,
+        hasEnvFallback,
+      };
+    }
+
+    if (hasEnvFallback) {
+      const key = process.env.ANTHROPIC_API_KEY!;
+      return {
+        method: 'env_fallback',
+        credentialsPath: null,
+        maskedToken: key.slice(0, 10) + '...' + key.slice(-3),
+        hasEnvFallback: true,
+      };
+    }
+
+    return {
+      method: 'none',
+      credentialsPath: null,
+      maskedToken: null,
+      hasEnvFallback: false,
+    };
+  }
+
+  // Clear stored credentials path and remove symlink.
+  clear(): void {
+    if (config.hostDrivePrefix) {
+      try { unlinkSync('/root/.claude/.credentials.json'); } catch {}
+    }
+    this.storedAuth = null;
+    this.save();
+  }
+}
