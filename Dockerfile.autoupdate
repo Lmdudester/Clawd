@@ -1,0 +1,24 @@
+FROM node:22-bookworm
+
+# Install git for cloning on startup
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code CLI globally
+RUN npm install -g @anthropic-ai/claude-code
+
+# Pre-create Claude config to bypass onboarding prompt when using OAuth
+RUN mkdir -p /root/.claude && echo '{"hasCompletedOnboarding":true}' > /root/.claude.json
+
+# Create app directory
+RUN mkdir -p /app/src
+
+WORKDIR /app
+
+# Copy entrypoint and fix line endings
+COPY scripts/entrypoint-autoupdate.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
+EXPOSE 3000
+
+ENTRYPOINT ["/entrypoint.sh"]

@@ -1,0 +1,21 @@
+# Auto-updating Clawd Docker deployment
+# Copy this file to docker-compose.autoupdate.yml and update the paths/keys below
+
+services:
+  clawd:
+    build:
+      context: .
+      dockerfile: Dockerfile.autoupdate
+    container_name: clawd
+    ports:
+      - "3000:3000"
+    volumes:
+      - /c:/host/c
+    environment:
+      - ANTHROPIC_API_KEY
+      - CLAWD_HOST=0.0.0.0
+      - CLAWD_PORT=3000
+      - HOST_DRIVE_PREFIX=/host/c
+      # - GIT_BRANCH=main
+      # - GIT_REPO_URL=https://github.com/Lmdudester/Clawd.git
+    restart: unless-stopped
