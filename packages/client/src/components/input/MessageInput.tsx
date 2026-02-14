@@ -35,7 +35,7 @@ export function MessageInput({ onSend, disabled }: Props) {
   };
 
   return (
-    <div className="flex items-end gap-2 p-3 bg-slate-900 border-t border-slate-800">
+    <div className="flex items-end gap-2 p-3 pb-5 bg-slate-900 border-t border-slate-800">
       <textarea
         ref={inputRef}
         value={value}
@@ -45,7 +45,7 @@ export function MessageInput({ onSend, disabled }: Props) {
         placeholder="Message Claude..."
         disabled={disabled}
         rows={1}
-        className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none text-sm"
+        className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none text-base"
       />
       <button
         onClick={handleSubmit}

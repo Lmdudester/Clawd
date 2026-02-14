@@ -11,6 +11,7 @@ import type {
   DiscoverCredentialsResponse,
   ProjectFoldersResponse,
   ProjectFolder,
+  UsageResponse,
 } from '@clawd/shared';
 
 const BASE_URL = '/api';
@@ -88,4 +89,8 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ folders }),
     }),
+
+  // Usage
+  getUsage: () =>
+    request<UsageResponse>('/usage'),
 };

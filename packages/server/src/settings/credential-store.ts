@@ -155,6 +155,20 @@ export class CredentialStore {
     };
   }
 
+  // Get the raw OAuth access token from the credentials file.
+  getAccessToken(): string | null {
+    if (!this.storedAuth) return null;
+
+    try {
+      const credFile = join(this.storedAuth.claudeDir, '.credentials.json');
+      const raw = readFileSync(credFile, 'utf-8');
+      const creds = JSON.parse(raw);
+      return creds.claudeAiOauth?.accessToken || creds.accessToken || null;
+    } catch {
+      return null;
+    }
+  }
+
   // Clear stored credentials path and remove symlink.
   clear(): void {
     if (config.hostDrivePrefix) {

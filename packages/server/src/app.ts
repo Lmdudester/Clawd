@@ -4,6 +4,7 @@ import { dirname, join } from 'path';
 import { authRouter } from './routes/auth.js';
 import { createSessionRoutes } from './routes/sessions.js';
 import { createSettingsRoutes } from './routes/settings.js';
+import { createUsageRoutes } from './routes/usage.js';
 import type { SessionManager } from './sessions/session-manager.js';
 import type { CredentialStore } from './settings/credential-store.js';
 import type { ProjectFolderStore } from './settings/project-folders.js';
@@ -19,6 +20,7 @@ export function createApp(sessionManager: SessionManager, credentialStore: Crede
   app.use('/api/auth', authRouter);
   app.use('/api/sessions', createSessionRoutes(sessionManager));
   app.use('/api/settings', createSettingsRoutes(credentialStore, projectFolderStore));
+  app.use('/api/usage', createUsageRoutes(credentialStore));
 
   // Serve static client build in production
   const clientDist = join(__dirname, '../../client/dist');

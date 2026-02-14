@@ -59,3 +59,34 @@ export interface ProjectFoldersResponse {
 export interface SetProjectFoldersRequest {
   folders: ProjectFolder[];
 }
+
+// Usage / Rate Limit types
+
+// Standard API tier bucket (requests, tokens, input-tokens, output-tokens)
+export interface RateLimitBucket {
+  limit: number;
+  remaining: number;
+  reset: string; // ISO 8601
+}
+
+// Claude Max unified bucket (5h, 7d windows)
+export interface UnifiedBucket {
+  utilization: number; // 0.0 – 1.0
+  reset: number; // epoch seconds
+  status: string; // "allowed" | "rejected" etc.
+}
+
+export interface UsageResponse {
+  // Standard API tier fields
+  requests: RateLimitBucket | null;
+  tokens: RateLimitBucket | null;
+  inputTokens: RateLimitBucket | null;
+  outputTokens: RateLimitBucket | null;
+  // Claude Max unified fields
+  unified5h: UnifiedBucket | null;
+  unified7d: UnifiedBucket | null;
+  unifiedFallbackPct: number | null;
+  //
+  authMethod: 'oauth_credentials_file' | 'env_fallback' | 'none';
+  fetchedAt: string;
+}
