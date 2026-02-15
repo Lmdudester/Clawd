@@ -240,3 +240,7 @@ The backend wraps the `@anthropic-ai/claude-agent-sdk`, managing Claude Code sub
 ## License
 
 This project is provided as-is for personal use.
+
+---
+
+*Last updated: February 2026*
