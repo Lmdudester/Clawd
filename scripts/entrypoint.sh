@@ -20,6 +20,12 @@ elif [ -n "$GIT_CREDENTIALS_URL" ]; then
     git config --global credential.helper store
 fi
 
+# --- Allow git to operate on volumes with different ownership ---
+# Mounted host directories appear owned by root inside the container while
+# we run as node. This tells git to trust all directories, which is safe
+# because we only mount directories the host user controls.
+git config --global --add safe.directory '*'
+
 # --- Pull latest code and rebuild on startup ---
 echo "[STARTUP] Pulling latest code..."
 git pull --ff-only || echo "[STARTUP] git pull failed, continuing with existing code"

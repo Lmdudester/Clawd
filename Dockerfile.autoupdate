@@ -23,6 +23,7 @@ RUN mkdir -p /home/node/.claude \
 
 USER node
 ENV HOME=/home/node
+RUN git config --global --add safe.directory '*'
 
 EXPOSE 3000
 

@@ -32,6 +32,7 @@ RUN mkdir -p /home/node/.claude \
 
 USER node
 ENV HOME=/home/node
+RUN git config --global --add safe.directory '*'
 
 # Expose the server port
 EXPOSE 3000

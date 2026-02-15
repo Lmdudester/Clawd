@@ -20,6 +20,9 @@ elif [ -n "$GIT_CREDENTIALS_URL" ]; then
     git config --global credential.helper store
 fi
 
+# --- Allow git to operate on volumes with different ownership ---
+git config --global --add safe.directory '*'
+
 echo "=== Clawd Auto-Update Startup ==="
 
 # Clean up any previous source directory
