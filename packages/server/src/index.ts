@@ -14,7 +14,7 @@ import { createApp } from './app.js';
 import { SessionManager } from './sessions/session-manager.js';
 import { CredentialStore } from './settings/credential-store.js';
 import { ProjectFolderStore } from './settings/project-folders.js';
-import { SmsNotifier } from './sms/sms-notifier.js';
+import { Notifier } from './notifications/notifier.js';
 import { setupWebSocket } from './ws/handler.js';
 import { config } from './config.js';
 import { networkInterfaces } from 'os';
@@ -39,16 +39,13 @@ switch (authStatus.method) {
     console.log(`Auth: OAuth credentials file (${authStatus.credentialsPath})`);
     if (authStatus.maskedToken) console.log(`  Token: ${authStatus.maskedToken}`);
     break;
-  case 'env_fallback':
-    console.log(`Auth: ANTHROPIC_API_KEY env var (${authStatus.maskedToken})`);
-    break;
   case 'none':
-    console.warn('Auth: No API key or OAuth credentials configured — configure via Settings');
+    console.warn('Auth: No OAuth credentials configured — configure via Settings');
     break;
 }
 
-const smsNotifier = new SmsNotifier();
-if (smsNotifier.enabled) {
+const notifier = new Notifier();
+if (notifier.enabled) {
   console.log(`Notifications: enabled via ntfy (topic: ${config.ntfyTopic})`);
 } else {
   console.log('Notifications: disabled (set NTFY_TOPIC to enable)');
@@ -58,7 +55,7 @@ const sessionManager = new SessionManager(credentialStore);
 const app = createApp(sessionManager, credentialStore, projectFolderStore);
 const server = createServer(app);
 
-setupWebSocket(server, sessionManager, smsNotifier);
+setupWebSocket(server, sessionManager, notifier);
 
 server.listen(config.port, config.host, () => {
   console.log(`\n  Clawd server running on http://${config.host}:${config.port}`);

@@ -1,6 +1,6 @@
 import { config } from '../config.js';
 
-export class SmsNotifier {
+export class Notifier {
   get enabled(): boolean {
     return !!config.ntfyTopic;
   }

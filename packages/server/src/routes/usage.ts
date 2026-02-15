@@ -62,18 +62,13 @@ export function createUsageRoutes(credentialStore: CredentialStore): Router {
       'anthropic-version': '2023-06-01',
     };
 
-    if (status.method === 'oauth_credentials_file') {
-      const token = credentialStore.getAccessToken();
-      if (!token) {
-        res.status(500).json({ error: 'Could not read OAuth access token' });
-        return;
-      }
-      headers['Authorization'] = `Bearer ${token}`;
-      headers['anthropic-beta'] = 'oauth-2025-04-20';
-    } else {
-      // env_fallback — use ANTHROPIC_API_KEY
-      headers['x-api-key'] = process.env.ANTHROPIC_API_KEY!;
+    const token = credentialStore.getAccessToken();
+    if (!token) {
+      res.status(500).json({ error: 'Could not read OAuth access token' });
+      return;
     }
+    headers['Authorization'] = `Bearer ${token}`;
+    headers['anthropic-beta'] = 'oauth-2025-04-20';
 
     try {
       const apiRes = await fetch(ANTHROPIC_API, {

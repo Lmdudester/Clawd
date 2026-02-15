@@ -30,10 +30,9 @@ export interface ErrorResponse {
 // Settings API types
 
 export interface AuthStatusResponse {
-  method: 'oauth_credentials_file' | 'env_fallback' | 'none';
+  method: 'oauth_credentials_file' | 'none';
   credentialsPath: string | null;
   maskedToken: string | null;
-  hasEnvFallback: boolean;
 }
 
 export interface SetCredentialsPathRequest {
@@ -87,6 +86,6 @@ export interface UsageResponse {
   unified7d: UnifiedBucket | null;
   unifiedFallbackPct: number | null;
   //
-  authMethod: 'oauth_credentials_file' | 'env_fallback' | 'none';
+  authMethod: 'oauth_credentials_file' | 'none';
   fetchedAt: string;
 }

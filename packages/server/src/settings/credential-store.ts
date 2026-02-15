@@ -103,20 +103,8 @@ export class CredentialStore {
     console.log(`Symlinked ${symlinkPath} -> ${targetFile}`);
   }
 
-  // Get env overrides for SDK sessions.
-  // When OAuth is configured, remove ANTHROPIC_API_KEY so the CLI uses the credentials file.
-  getEnvOverrides(): Record<string, string | undefined> {
-    if (this.storedAuth) {
-      // Remove the API key so CLI falls through to credentials file
-      return { ANTHROPIC_API_KEY: undefined };
-    }
-    return {};
-  }
-
   // Get current auth status for display.
   getStatus(): AuthStatusResponse {
-    const hasEnvFallback = !!process.env.ANTHROPIC_API_KEY;
-
     if (this.storedAuth) {
       const credFile = join(this.storedAuth.claudeDir, '.credentials.json');
       let maskedToken: string | null = null;
@@ -124,7 +112,6 @@ export class CredentialStore {
       try {
         const raw = readFileSync(credFile, 'utf-8');
         const creds = JSON.parse(raw);
-        // The credentials file typically has an accessToken or oauth_token
         const token = creds.claudeAiOauth?.accessToken || creds.accessToken || '';
         if (token) {
           maskedToken = token.slice(0, 8) + '...' + token.slice(-4);
@@ -135,17 +122,6 @@ export class CredentialStore {
         method: 'oauth_credentials_file',
         credentialsPath: this.storedAuth.claudeDir,
         maskedToken,
-        hasEnvFallback,
-      };
-    }
-
-    if (hasEnvFallback) {
-      const key = process.env.ANTHROPIC_API_KEY!;
-      return {
-        method: 'env_fallback',
-        credentialsPath: null,
-        maskedToken: key.slice(0, 10) + '...' + key.slice(-3),
-        hasEnvFallback: true,
       };
     }
 
@@ -153,7 +129,6 @@ export class CredentialStore {
       method: 'none',
       credentialsPath: null,
       maskedToken: null,
-      hasEnvFallback: false,
     };
   }
 

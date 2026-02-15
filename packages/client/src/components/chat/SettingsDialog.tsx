@@ -123,7 +123,7 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onCha
             </div>
           </div>
 
-          {/* SMS Notifications */}
+          {/* Notifications */}
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1.5">Notifications</label>
             <button

@@ -120,16 +120,6 @@ export class SessionManager {
       delete cleanEnv.VSCODE_INSPECTOR_OPTIONS;
       delete cleanEnv.CLAUDECODE;
 
-      // Apply credential store overrides (removes ANTHROPIC_API_KEY when OAuth is configured)
-      const envOverrides = this.credentialStore.getEnvOverrides();
-      for (const [key, value] of Object.entries(envOverrides)) {
-        if (value === undefined) {
-          delete cleanEnv[key];
-        } else {
-          cleanEnv[key] = value;
-        }
-      }
-
       const queryStream = query({
         prompt: session.channel as AsyncIterable<any>,
         options: {

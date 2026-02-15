@@ -93,11 +93,6 @@ export function AuthSettings() {
           </div>
         )}
 
-        {status?.hasEnvFallback && status.method !== 'env_fallback' && (
-          <p className="text-xs text-slate-500">
-            Fallback: ANTHROPIC_API_KEY env var is also available
-          </p>
-        )}
       </div>
 
       {/* Error display */}
@@ -151,7 +146,7 @@ export function AuthSettings() {
       {/* Help text */}
       <div className="text-xs text-slate-500 space-y-1">
         <p>
-          OAuth credentials allow using your Claude Max subscription instead of a separate API key.
+          OAuth credentials connect to your Claude Max subscription via the Claude CLI.
         </p>
         <p>
           The server reads your local Claude CLI credentials file directly, so token refresh is automatic.
@@ -165,8 +160,6 @@ function StatusLabel({ method }: { method: AuthStatusResponse['method'] }) {
   switch (method) {
     case 'oauth_credentials_file':
       return <span className="text-sm font-medium text-green-400">OAuth Credentials File</span>;
-    case 'env_fallback':
-      return <span className="text-sm font-medium text-amber-400">API Key (env var)</span>;
     case 'none':
       return <span className="text-sm font-medium text-red-400">Not Configured</span>;
   }

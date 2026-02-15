@@ -13,7 +13,6 @@ services:
       - /c:/host/c
       - ./credentials.json:/app/credentials.json:ro
     environment:
-      - ANTHROPIC_API_KEY
       - CLAWD_HOST=0.0.0.0
       - CLAWD_PORT=3000
       - HOST_DRIVE_PREFIX=/host/c

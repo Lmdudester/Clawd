@@ -13,7 +13,7 @@ A web-based remote interface for [Claude Code](https://docs.anthropic.com/en/doc
   - *Plan* — Deny all tool calls, forcing Claude to describe rather than execute
 - **Model switching** — Switch between available Claude models mid-session
 - **API usage monitoring** — Real-time Anthropic API rate limit display with color-coded progress bars
-- **Dual authentication** — Use an Anthropic API key or OAuth credentials from an existing Claude CLI installation (Claude Max)
+- **OAuth authentication** — Use OAuth credentials from an existing Claude CLI installation (Claude Max)
 - **Project folder bookmarks** — Save frequently-used project directories for quick session creation
 - **Windows path translation** — Seamless translation between Windows host paths and Docker container paths
 - **Push notifications** — Optional [ntfy.sh](https://ntfy.sh) integration sends mobile/desktop alerts when a session needs approval, asks a question, or finishes a task (only fires when no one is actively viewing the session)
@@ -59,9 +59,7 @@ clawd/
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
-- One of the following for Claude access:
-  - An [Anthropic API key](https://console.anthropic.com/)
-  - An existing [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installation with OAuth credentials (Claude Max subscription)
+- An existing [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installation with OAuth credentials (Claude Max subscription)
 
 ### Quick Start
 
@@ -86,7 +84,6 @@ clawd/
 
    ```bash
    cp .env.example .env
-   # Edit .env and add your Anthropic API key (optional if using OAuth)
    ```
 
 4. **Update `docker-compose.yml`** volume mounts to match your host filesystem:
@@ -192,7 +189,6 @@ Requires [Node.js 22+](https://nodejs.org/) and npm.
 
    ```bash
    cp .env.example .env
-   # Add your ANTHROPIC_API_KEY to .env
 
    # Create credentials.json with your login credentials
    echo '[{"username": "dev", "password": "dev"}]' > credentials.json
@@ -217,7 +213,6 @@ npm start       # Start the production server
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | — | Anthropic API key (optional if using OAuth) |
 | `CLAWD_HOST` | `localhost` | Server bind address (`0.0.0.0` for Docker/LAN access) |
 | `CLAWD_PORT` | `3050` | Server port |
 | `HOST_DRIVE_PREFIX` | — | Container path prefix for host drive mount (e.g., `/host/c`) |

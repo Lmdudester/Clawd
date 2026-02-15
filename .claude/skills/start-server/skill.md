@@ -27,7 +27,7 @@ cd /c/Users/lmdud/OneDrive/Documents/Programming/Clawd && npm run dev 2>&1
 ## 3. Wait for startup
 
 Wait 6 seconds, then check the background task output for:
-- `[server]` lines showing the server startup banner (ANTHROPIC_API_KEY status, listening URL)
+- `[server]` lines showing the server startup banner (auth status, listening URL)
 - `[client]` lines showing Vite is ready
 
 Also verify with `netstat -ano | grep -E ":(3050|3051) " | grep LISTEN` that both ports are listening.

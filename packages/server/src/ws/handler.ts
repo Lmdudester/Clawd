@@ -3,9 +3,9 @@ import type { Server } from 'http';
 import { ConnectionManager } from './connection-manager.js';
 import { MessageRouter } from './message-router.js';
 import type { SessionManager } from '../sessions/session-manager.js';
-import type { SmsNotifier } from '../sms/sms-notifier.js';
+import type { Notifier } from '../notifications/notifier.js';
 
-export function setupWebSocket(server: Server, sessionManager: SessionManager, smsNotifier?: SmsNotifier): ConnectionManager {
+export function setupWebSocket(server: Server, sessionManager: SessionManager, notifier?: Notifier): ConnectionManager {
   const wss = new WebSocketServer({ server, path: '/ws' });
   const connectionManager = new ConnectionManager();
   const messageRouter = new MessageRouter(sessionManager, connectionManager);
@@ -13,8 +13,8 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, s
   // Debounce result push notifications — only send if session stays idle for 3s
   const pendingResultPush = new Map<string, ReturnType<typeof setTimeout>>();
 
-  // Only send SMS when notifications are enabled AND no one is viewing the session
-  const shouldSms = (sessionId: string) =>
+  // Only send push notification when notifications are enabled AND no one is viewing the session
+  const shouldNotify = (sessionId: string) =>
     sessionManager.getSession(sessionId)?.info.notificationsEnabled &&
     !connectionManager.hasSubscribers(sessionId);
 
@@ -39,17 +39,17 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, s
         break;
       case 'approval_request': {
         connectionManager.broadcast(sessionId, { type: 'approval_request', sessionId, approval: data });
-        if (shouldSms(sessionId)) {
+        if (shouldNotify(sessionId)) {
           const sessionName = sessionManager.getSession(sessionId)?.info.name ?? sessionId;
-          smsNotifier?.sendNotification('Approval Needed', `Session "${sessionName}" needs approval`);
+          notifier?.sendNotification('Approval Needed', `Session "${sessionName}" needs approval`);
         }
         break;
       }
       case 'question': {
         connectionManager.broadcast(sessionId, { type: 'question', sessionId, question: data });
-        if (shouldSms(sessionId)) {
+        if (shouldNotify(sessionId)) {
           const sessionName = sessionManager.getSession(sessionId)?.info.name ?? sessionId;
-          smsNotifier?.sendNotification('Question', `Session "${sessionName}" has a question`);
+          notifier?.sendNotification('Question', `Session "${sessionName}" has a question`);
         }
         break;
       }
@@ -62,8 +62,8 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, s
         const sessionName = sessionManager.getSession(sessionId)?.info.name ?? sessionId;
         const timeout = setTimeout(() => {
           pendingResultPush.delete(sessionId);
-          if (shouldSms(sessionId)) {
-            smsNotifier?.sendNotification('Task Complete', `Session "${sessionName}" is idle`);
+          if (shouldNotify(sessionId)) {
+            notifier?.sendNotification('Task Complete', `Session "${sessionName}" is idle`);
           }
         }, 3000);
         pendingResultPush.set(sessionId, timeout);
