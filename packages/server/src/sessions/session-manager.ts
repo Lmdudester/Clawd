@@ -443,10 +443,28 @@ export class SessionManager {
     session.pendingQuestion.resolve(answers);
   }
 
-  interruptSession(sessionId: string): void {
+  async interruptSession(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
-    session.abortController.abort();
+
+    const { status } = session.info;
+    if (status === 'idle' || status === 'terminated' || status === 'error') return;
+
+    console.log(`[session:${sessionId}] interrupting (was ${status})`);
+
+    // Resolve any pending approval/question so the awaiting promises settle
+    if (session.pendingApproval) {
+      session.pendingApproval.resolve({ behavior: 'deny', message: 'Interrupted by user' });
+      session.pendingApproval = null;
+    }
+    if (session.pendingQuestion) {
+      session.pendingQuestion.resolve({});
+      session.pendingQuestion = null;
+    }
+
+    // Gracefully interrupt the current turn — the SDK will emit a `result`
+    // message which triggers updateStatus(session, 'idle') through handleSDKMessage
+    session.queryStream?.interrupt();
   }
 
   async getSupportedModels(sessionId: string): Promise<{ value: string; displayName: string; description: string }[]> {

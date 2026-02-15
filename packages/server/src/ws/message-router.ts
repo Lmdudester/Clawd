@@ -103,7 +103,9 @@ export class MessageRouter {
         break;
 
       case 'interrupt':
-        this.sessionManager.interruptSession(message.sessionId);
+        this.sessionManager.interruptSession(message.sessionId).catch((err) => {
+          console.error(`WS: interrupt error for session ${message.sessionId}:`, err);
+        });
         break;
 
       case 'update_session_settings':

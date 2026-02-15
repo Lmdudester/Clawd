@@ -3,9 +3,10 @@ import type { PendingApproval } from '@clawd/shared';
 interface Props {
   approval: PendingApproval;
   onApprove: (approvalId: string, allow: boolean) => void;
+  onInterrupt?: () => void;
 }
 
-export function ApprovalBanner({ approval, onApprove }: Props) {
+export function ApprovalBanner({ approval, onApprove, onInterrupt }: Props) {
   const toolName = approval.toolName;
   const preview =
     toolName === 'Bash'
@@ -36,6 +37,14 @@ export function ApprovalBanner({ approval, onApprove }: Props) {
           Yes
         </button>
       </div>
+      {onInterrupt && (
+        <button
+          onClick={onInterrupt}
+          className="w-full py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-950/30 transition-colors"
+        >
+          Stop entire turn
+        </button>
+      )}
     </div>
   );
 }

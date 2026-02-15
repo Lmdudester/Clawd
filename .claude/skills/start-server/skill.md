@@ -2,7 +2,7 @@
 name: start-server
 description: Start the Clawd dev server (Express + Vite) after verifying ports are free
 disable-model-invocation: true
-allowed-tools: Bash(netstat *), Bash(taskkill *), Bash(cd * && npm run dev *), Bash(sleep *)
+allowed-tools: Bash(netstat *), Bash(taskkill *), Bash(cd * && npm run dev *), Bash(sleep *), Bash(start http://localhost:3051)
 ---
 
 Start the Clawd dev server. Follow these steps exactly:
@@ -41,3 +41,11 @@ Report:
 - The background task ID (so the user can check logs later)
 
 If the server isn't up after 6 seconds, wait another 10 seconds and check again before reporting failure.
+
+## 5. Open in browser
+
+Once both ports are confirmed listening, open the site:
+
+```
+start http://localhost:3051
+```

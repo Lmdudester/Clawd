@@ -4,9 +4,10 @@ import type { PendingQuestion } from '@clawd/shared';
 interface Props {
   question: PendingQuestion;
   onAnswer: (questionId: string, answers: Record<string, string>) => void;
+  onInterrupt?: () => void;
 }
 
-export function QuestionPanel({ question, onAnswer }: Props) {
+export function QuestionPanel({ question, onAnswer, onInterrupt }: Props) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
 
@@ -67,12 +68,22 @@ export function QuestionPanel({ question, onAnswer }: Props) {
           />
         </div>
       ))}
-      <button
-        onClick={handleSubmit}
-        className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-      >
-        Submit Answer
-      </button>
+      <div className="flex gap-2">
+        {onInterrupt && (
+          <button
+            onClick={onInterrupt}
+            className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Stop
+          </button>
+        )}
+        <button
+          onClick={handleSubmit}
+          className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+        >
+          Submit Answer
+        </button>
+      </div>
     </div>
   );
 }

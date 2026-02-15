@@ -61,6 +61,11 @@ export function ChatView() {
     send({ type: 'answer_question', sessionId: id, questionId, answers });
   }, [id, send]);
 
+  const handleInterrupt = useCallback(() => {
+    if (!id) return;
+    send({ type: 'interrupt', sessionId: id });
+  }, [id, send]);
+
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleUpdateSettings = useCallback((settings: SessionSettingsUpdate) => {
@@ -85,6 +90,7 @@ export function ChatView() {
   const streamingText = streamingKey ? streamingTokens.get(streamingKey) ?? '' : '';
 
   const isInputDisabled = session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer' || session?.status === 'terminated';
+  const isInterruptible = session?.status === 'running' || session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer';
 
   return (
     <div className="h-screen flex flex-col bg-slate-950">
@@ -140,11 +146,11 @@ export function ChatView() {
 
       {/* Input area - transforms based on state */}
       {pendingApproval && session?.status === 'awaiting_approval' ? (
-        <ApprovalBanner approval={pendingApproval} onApprove={handleApprove} />
+        <ApprovalBanner approval={pendingApproval} onApprove={handleApprove} onInterrupt={handleInterrupt} />
       ) : pendingQuestion && session?.status === 'awaiting_answer' ? (
-        <QuestionPanel question={pendingQuestion} onAnswer={handleAnswer} />
+        <QuestionPanel question={pendingQuestion} onAnswer={handleAnswer} onInterrupt={handleInterrupt} />
       ) : (
-        <MessageInput onSend={handleSend} disabled={isInputDisabled} />
+        <MessageInput onSend={handleSend} disabled={isInputDisabled} isInterruptible={isInterruptible} onInterrupt={handleInterrupt} />
       )}
 
       {session && (
