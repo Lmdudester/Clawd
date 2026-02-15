@@ -13,16 +13,19 @@ import type {
 } from '@clawd/shared';
 import type { CredentialStore } from '../settings/credential-store.js';
 
-function toSDKPermissionMode(mode: PermissionMode): 'default' | 'plan' | 'bypassPermissions' {
-  switch (mode) {
-    case 'plan': return 'plan';
-    case 'auto_accept': return 'bypassPermissions';
-    default: return 'default';
-  }
+const READONLY_TOOLS = new Set([
+  'Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch',
+  'EnterPlanMode', 'TodoRead', 'TaskList', 'TaskGet',
+]);
+const READONLY_MCP_PREFIXES = ['mcp__playwright__'];
+
+function toSDKPermissionMode(mode: PermissionMode): 'default' | 'plan' {
+  return mode === 'plan' ? 'plan' : 'default';
 }
 
 interface ManagedSession {
   info: SessionInfo;
+  containerCwd: string;
   messages: SessionMessage[];
   channel: MessageChannel;
   abortController: AbortController;
@@ -93,6 +96,7 @@ export class SessionManager {
 
     const session: ManagedSession = {
       info,
+      containerCwd,
       messages: [],
       channel,
       abortController,
@@ -129,7 +133,6 @@ export class SessionManager {
           includePartialMessages: true,
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           permissionMode: 'default',
-          allowDangerouslySkipPermissions: true,
           mcpServers: {
             playwright: {
               type: 'stdio',
@@ -138,6 +141,21 @@ export class SessionManager {
             },
           },
           canUseTool: async (toolName, input) => {
+            // Dangerous: approve everything
+            if (session.info.permissionMode === 'dangerous') {
+              console.log(`[session:${session.info.id}] auto-approved: ${toolName}`);
+              return { behavior: 'allow', updatedInput: input };
+            }
+            // Auto-edits: approve file mutations within CWD
+            if (session.info.permissionMode === 'auto_edits') {
+              const filePath = this.getEditFilePath(toolName, input);
+              const normalizedFile = filePath?.replace(/\\/g, '/');
+              const normalizedCwd = session.containerCwd.replace(/\\/g, '/');
+              if (normalizedFile && normalizedFile.startsWith(normalizedCwd + '/')) {
+                console.log(`[session:${session.info.id}] auto-edit approved: ${toolName}`);
+                return { behavior: 'allow', updatedInput: input };
+              }
+            }
             return this.handleToolApproval(session, toolName, input);
           },
           stderr: (data: string) => {
@@ -165,6 +183,19 @@ export class SessionManager {
         content: err.message || 'Unknown error',
         timestamp: new Date().toISOString(),
       });
+    }
+  }
+
+  private getEditFilePath(toolName: string, input: Record<string, unknown>): string | null {
+    switch (toolName) {
+      case 'Edit':
+      case 'Write':
+      case 'Read':
+        return (input.file_path as string) || null;
+      case 'NotebookEdit':
+        return (input.notebook_path as string) || null;
+      default:
+        return null;
     }
   }
 
@@ -213,6 +244,22 @@ export class SessionManager {
 
       console.log(`[session:${session.info.id}] plan exit denied — staying in plan mode`);
       return { behavior: 'deny', message: result.message || 'Plan not approved' };
+    }
+
+    // Plan mode guard: allow read-only tools, deny mutations
+    if (session.info.permissionMode === 'plan') {
+      if (READONLY_TOOLS.has(toolName) ||
+          READONLY_MCP_PREFIXES.some(p => toolName.startsWith(p))) {
+        return { behavior: 'allow', updatedInput: input };
+      }
+      console.log(`[session:${session.info.id}] plan mode blocked tool: ${toolName}`);
+      return { behavior: 'deny', message: 'Tool execution is not allowed in plan mode' };
+    }
+
+    // Auto-approve read-only tools (normal + auto_edits modes reach here)
+    if (READONLY_TOOLS.has(toolName) ||
+        READONLY_MCP_PREFIXES.some(p => toolName.startsWith(p))) {
+      return { behavior: 'allow', updatedInput: input };
     }
 
     // Show approval dialog
@@ -321,8 +368,7 @@ export class SessionManager {
         for (const block of toolBlocks) {
           const name = (block as any).name;
 
-          // Detect EnterPlanMode from the message stream so it works even
-          // when canUseTool is skipped (e.g. bypassPermissions mode).
+          // Detect EnterPlanMode from the message stream.
           if (name === 'EnterPlanMode' && session.info.permissionMode !== 'plan') {
             session.info.permissionMode = 'plan';
             session.queryStream?.setPermissionMode('plan');

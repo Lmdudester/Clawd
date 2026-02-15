@@ -10,6 +10,7 @@ import { MessageInput } from '../input/MessageInput';
 import { ApprovalBanner } from '../input/ApprovalBanner';
 import { QuestionPanel } from '../input/QuestionPanel';
 import { SettingsDialog } from './SettingsDialog';
+import { MODE_THEME } from '../../lib/mode-theme';
 
 const EMPTY_MESSAGES: SessionMessage[] = [];
 
@@ -133,14 +134,19 @@ export function ChatView() {
       <MessageList messages={messages} streamingText={streamingText} />
 
       {/* Permission mode status bar */}
-      {session?.permissionMode === 'auto_accept' && (
-        <div key="mode-auto" className="px-4 py-1.5 bg-purple-900/60 border-t border-purple-500/50 text-purple-200 text-xs font-medium text-center shrink-0">
-          Auto Accept — tools will be approved automatically
+      {session?.permissionMode === 'auto_edits' && (
+        <div key="mode-edits" className={`px-4 py-1.5 ${MODE_THEME.auto_edits.banner} text-xs font-medium text-center shrink-0`}>
+          Auto-Edits — file edits in project will be approved automatically
+        </div>
+      )}
+      {session?.permissionMode === 'dangerous' && (
+        <div key="mode-danger" className={`px-4 py-1.5 ${MODE_THEME.dangerous.banner} text-xs font-medium text-center shrink-0`}>
+          Dangerous — all tools will be approved automatically
         </div>
       )}
       {session?.permissionMode === 'plan' && (
-        <div key="mode-plan" className="px-4 py-1.5 bg-sky-900/60 border-t border-sky-500/50 text-sky-200 text-xs font-medium text-center shrink-0">
-          Plan Mode — tool use is disabled
+        <div key="mode-plan" className={`px-4 py-1.5 ${MODE_THEME.plan.banner} text-xs font-medium text-center shrink-0`}>
+          Plan Mode — read-only, edits are disabled
         </div>
       )}
 

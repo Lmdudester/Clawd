@@ -1,6 +1,6 @@
 // Session and message types shared between server and client
 
-export type PermissionMode = 'normal' | 'auto_accept' | 'plan';
+export type PermissionMode = 'normal' | 'auto_edits' | 'dangerous' | 'plan';
 
 export type SessionStatus =
   | 'idle'

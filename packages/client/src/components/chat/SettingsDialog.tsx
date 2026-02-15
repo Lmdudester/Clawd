@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { SessionInfo, PermissionMode, ModelInfo } from '@clawd/shared';
-
+import { MODE_THEME } from '../../lib/mode-theme';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -14,8 +14,9 @@ interface SettingsDialogProps {
 
 const PERMISSION_MODES: { value: PermissionMode; label: string; description: string }[] = [
   { value: 'normal', label: 'Normal', description: 'Prompt for each tool' },
-  { value: 'auto_accept', label: 'Auto Accept', description: 'Auto-approve all tools' },
   { value: 'plan', label: 'Plan', description: 'Deny tools, plan only' },
+  { value: 'auto_edits', label: 'Auto-Edits', description: 'Auto-approve file edits in project' },
+  { value: 'dangerous', label: 'Dangerous', description: 'Auto-approve all tools' },
 ];
 
 export function SettingsDialog({ open, onClose, session, onUpdateSettings, onChangeModel, availableModels, onRequestModels }: SettingsDialogProps) {
@@ -113,7 +114,7 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onCha
                   title={mode.description}
                   className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
                     session.permissionMode === mode.value
-                      ? 'bg-blue-600 text-white'
+                      ? MODE_THEME[mode.value].toggle
                       : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   }`}
                 >

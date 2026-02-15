@@ -32,7 +32,7 @@ export function useUsage() {
   }, []);
 
   useEffect(() => {
-    if (!cachedUsage && !fetchPromise) refresh();
+    refresh();
   }, [refresh]);
 
   return { usage: cachedUsage, loading, error, refresh };
