@@ -16,6 +16,7 @@ A web-based remote interface for [Claude Code](https://docs.anthropic.com/en/doc
 - **Dual authentication** — Use an Anthropic API key or OAuth credentials from an existing Claude CLI installation (Claude Max)
 - **Project folder bookmarks** — Save frequently-used project directories for quick session creation
 - **Windows path translation** — Seamless translation between Windows host paths and Docker container paths
+- **Push notifications** — Optional [ntfy.sh](https://ntfy.sh) integration sends mobile/desktop alerts when a session needs approval, asks a question, or finishes a task (only fires when no one is actively viewing the session)
 - **PWA support** — Install as a Progressive Web App for an app-like experience on mobile
 - **Auto-update deployment** — Optional Docker configuration that pulls the latest code on every container start
 
@@ -104,6 +105,8 @@ clawd/
 
 6. **Open** `http://localhost:3000` in your browser and log in with the credentials you configured.
 
+> **Note:** The standard Docker entrypoint runs `git pull`, `npm install`, and `npm run build` on every container start, so it will automatically pick up new commits if the repository is mounted. To disable this behavior, use the auto-update Dockerfile instead (which clones fresh on each start) or remove the pull/build steps from `scripts/entrypoint.sh`.
+
 ### Using OAuth (Claude Max)
 
 If you have a Claude Max subscription with the Claude CLI installed:
@@ -140,6 +143,21 @@ The entrypoint script configures `git config --global` identity and credential s
 
 > **Non-GitHub hosts:** Use `GIT_CREDENTIALS_URL` instead of `GITHUB_TOKEN` with the format `https://username:token@your-git-host.com`.
 
+### Push Notifications (ntfy.sh)
+
+Clawd can send push notifications to your phone or desktop when a session needs your attention (tool approval, question, or task completion) and no one is actively viewing the session.
+
+1. **Install the [ntfy app](https://ntfy.sh)** on your phone or subscribe to a topic in the web UI
+2. **Choose a unique topic name** (e.g., `clawd-myname`) and subscribe to it in the app
+3. **Add environment variables** to your `.env` file:
+
+   ```bash
+   NTFY_TOPIC=clawd-myname
+   # NTFY_SERVER=https://ntfy.sh   # Only needed if self-hosting
+   ```
+
+4. **Enable notifications per session** — Open a session's settings in the Clawd UI and toggle notifications on. Notifications are disabled by default for each session.
+
 ### Auto-Update Deployment
 
 For a deployment that automatically pulls the latest code on every container restart:
@@ -161,6 +179,8 @@ For a deployment that automatically pulls the latest code on every container res
 ## Development
 
 ### Local Development Setup
+
+Requires [Node.js 22+](https://nodejs.org/) and npm.
 
 1. **Install dependencies:**
 
@@ -213,6 +233,13 @@ npm start       # Start the production server
 | `GIT_USER_EMAIL` | `<name>@users.noreply.github.com` | Git commit author email |
 | `GITHUB_TOKEN` | — | GitHub PAT for HTTPS push (writes `git-credentials` at startup) |
 | `GIT_CREDENTIALS_URL` | — | Full credentials URL for non-GitHub hosts (e.g., `https://user:token@gitlab.com`) |
+
+### Push Notifications (Optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NTFY_TOPIC` | — | [ntfy.sh](https://ntfy.sh) topic name (e.g., `clawd-your-topic`) — enables push notifications |
+| `NTFY_SERVER` | `https://ntfy.sh` | ntfy server URL (use default unless self-hosting) |
 
 ### Auto-Update Only
 
