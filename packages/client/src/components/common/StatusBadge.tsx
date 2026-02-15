@@ -1,7 +1,7 @@
 import type { SessionStatus } from '@clawd/shared';
 
 const statusConfig: Record<SessionStatus, { dot: string; border: string; text: string; label: string }> = {
-  idle: { dot: 'bg-slate-500', border: 'border-slate-500/50', text: 'text-slate-400', label: 'Idle' },
+  idle: { dot: 'bg-slate-400', border: 'border-slate-400/50', text: 'text-slate-300', label: 'Idle' },
   running: { dot: 'bg-green-500', border: 'border-green-500/50', text: 'text-green-400', label: 'Running' },
   awaiting_approval: { dot: 'bg-amber-500', border: 'border-amber-500/50', text: 'text-amber-400', label: 'Approval' },
   awaiting_answer: { dot: 'bg-purple-500', border: 'border-purple-500/50', text: 'text-purple-400', label: 'Question' },

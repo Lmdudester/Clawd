@@ -36,10 +36,10 @@ function StandardBar({ label, bucket }: { label: string; bucket: RateLimitBucket
   return (
     <div>
       <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-slate-400">{label}</span>
-        <span className="text-slate-500">
+        <span className="text-slate-300">{label}</span>
+        <span className="text-slate-400">
           {formatNumber(used)} / {formatNumber(bucket.limit)}
-          <span className="ml-2 text-slate-600">({formatRelativeTime(bucket.reset)})</span>
+          <span className="ml-2 text-slate-500">({formatRelativeTime(bucket.reset)})</span>
         </span>
       </div>
       <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
@@ -58,10 +58,10 @@ function UnifiedBar({ label, bucket }: { label: string; bucket: UnifiedBucket })
   return (
     <div>
       <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-slate-400">{label}</span>
-        <span className="text-slate-500">
+        <span className="text-slate-300">{label}</span>
+        <span className="text-slate-400">
           {pctUsed.toFixed(0)}% used
-          <span className="ml-2 text-slate-600">({formatRelativeTime(bucket.reset)})</span>
+          <span className="ml-2 text-slate-500">({formatRelativeTime(bucket.reset)})</span>
         </span>
       </div>
       <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
@@ -88,11 +88,11 @@ export function UsageCard() {
   return (
     <div className="p-4 bg-slate-900/80 border border-slate-800/50 rounded-xl">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-base font-medium text-slate-300">API Usage</h3>
+        <h3 className="text-base font-medium text-slate-200">API Usage</h3>
         <button
           onClick={refresh}
           disabled={loading}
-          className="p-1 rounded border border-blue-600/50 text-blue-500 hover:text-blue-400 hover:border-blue-400/50 transition-colors disabled:opacity-50"
+          className="p-1 rounded border border-blue-500/50 text-blue-400 hover:text-blue-300 hover:border-blue-300/50 transition-colors disabled:opacity-50"
           aria-label="Refresh usage"
         >
           <svg
@@ -111,7 +111,7 @@ export function UsageCard() {
       </div>
 
       {loading && !usage ? (
-        <div className="text-sm text-slate-500">Loading usage...</div>
+        <div className="text-sm text-slate-400">Loading usage...</div>
       ) : (
         <div className="space-y-2.5">
           {usage?.unified5h && <UnifiedBar label="5-hour window" bucket={usage.unified5h} />}

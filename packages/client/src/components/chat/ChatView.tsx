@@ -92,7 +92,7 @@ export function ChatView() {
       <header className="flex items-center gap-3 px-4 py-3 bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 shrink-0">
         <button
           onClick={() => navigate('/')}
-          className="text-slate-400 hover:text-white transition-colors text-xl border border-slate-700 rounded w-8 h-8 flex items-center justify-center"
+          className="text-slate-200 hover:text-white transition-colors text-xl border border-slate-500 rounded w-8 h-8 flex items-center justify-center"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
             <path fillRule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z" clipRule="evenodd" />
@@ -110,11 +110,11 @@ export function ChatView() {
             )}
             {session && <StatusBadge status={session.status} />}
           </div>
-          <span className="text-sm text-slate-500 bg-blue-950/40 px-2 py-0.5 rounded truncate max-w-[200px]">{session?.cwd.split(/[/\\]/).filter(Boolean).pop()}</span>
+          <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded truncate max-w-[200px]">{session?.cwd.split(/[/\\]/).filter(Boolean).pop()}</span>
         </div>
         <button
           onClick={() => setSettingsOpen(true)}
-          className="text-slate-400 hover:text-white transition-colors border border-slate-700 rounded w-8 h-8 flex items-center justify-center shrink-0"
+          className="text-slate-200 hover:text-white transition-colors border border-slate-500 rounded w-8 h-8 flex items-center justify-center shrink-0"
           title="Session settings"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">

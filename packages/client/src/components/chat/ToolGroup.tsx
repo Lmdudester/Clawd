@@ -17,18 +17,18 @@ export function ToolGroup({ messages }: Props) {
     <div className="mx-4 my-1">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/40 border border-slate-700/30 rounded-md text-[11px] text-slate-500 hover:text-slate-400 hover:bg-slate-800/60 transition-colors w-fit max-w-full"
+        className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/40 border border-slate-600 rounded-md text-sm text-white hover:text-white hover:bg-slate-900/50 transition-colors w-fit max-w-full"
       >
-        <span className={`transition-transform text-[10px] ${expanded ? 'rotate-90' : ''}`}>&#9654;</span>
-        <span className="text-slate-400">
+        <span className={`transition-transform text-lg ${expanded ? 'rotate-90' : ''}`}>&#9654;</span>
+        <span className="text-white">
           {callCount} tool call{callCount !== 1 ? 's' : ''}
         </span>
         {!expanded && uniqueTools.length > 0 && (
-          <span className="font-mono text-slate-500/70">{uniqueTools.join(', ')}</span>
+          <span className="font-mono text-slate-100">{uniqueTools.join(', ')}</span>
         )}
       </button>
       {expanded && (
-        <div className="mt-1 ml-1 pl-2 border-l border-slate-700/30">
+        <div className="mt-1 ml-1 pl-2 border-l border-slate-600">
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}

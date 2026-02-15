@@ -26,13 +26,21 @@ export function PlanCard({ toolCall, result, fullContent, defaultCollapsed }: Pr
       <div className="mx-4 my-2">
         <div
           className="border-l-[3px] border-l-sky-500 bg-sky-950/30 border border-sky-800/50 rounded-r-lg overflow-hidden cursor-pointer hover:bg-sky-950/40 transition-colors"
-          onClick={() => collapsed ? setCollapsed(false) : setOverlayOpen(true)}
+          onClick={() => setOverlayOpen(true)}
         >
           {/* Header */}
           <div className={`flex items-center gap-2 px-3 py-2 ${collapsed ? '' : 'border-b border-sky-800/30'}`}>
-            <svg className={`w-4 h-4 text-sky-400 shrink-0 transition-transform ${collapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setCollapsed(!collapsed);
+              }}
+              className="shrink-0 text-sky-400 hover:text-sky-300 transition-colors"
+            >
+              <svg className={`w-4 h-4 transition-transform ${collapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
             <svg className="w-4 h-4 text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>

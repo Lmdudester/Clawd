@@ -36,7 +36,7 @@ export function SessionCard({ session }: { session: SessionInfo }) {
           <span
             role="button"
             onClick={handleClose}
-            className="p-1 rounded border border-red-900/50 text-red-900 hover:text-red-700 hover:border-red-700/50 active:text-red-500 transition-colors"
+            className="p-1 rounded border border-red-500/50 text-red-500 hover:text-red-400 hover:border-red-400/50 active:text-red-300 transition-colors"
             aria-label="Close session"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
@@ -49,8 +49,8 @@ export function SessionCard({ session }: { session: SessionInfo }) {
         <p className="text-base text-slate-400 truncate">{session.lastMessagePreview}</p>
       )}
       <div className="flex items-center justify-between mt-2">
-        <span className="text-sm text-slate-500 bg-blue-950/40 px-2 py-0.5 rounded">{session.cwd.split(/[/\\]/).filter(Boolean).pop()}</span>
-        <span className="text-sm text-slate-500 bg-blue-950/40 px-2 py-0.5 rounded">{new Date(session.createdAt).toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+        <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded">{session.cwd.split(/[/\\]/).filter(Boolean).pop()}</span>
+        <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded">{new Date(session.createdAt).toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
       </div>
     </button>
   );
