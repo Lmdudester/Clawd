@@ -26,7 +26,7 @@ cd /c/Users/lmdud/OneDrive/Documents/Programming/Clawd && npm run dev 2>&1
 
 ## 3. Wait for startup
 
-Wait 20 seconds (node --watch + Vite both need time to compile), then check the background task output for:
+Wait 6 seconds, then check the background task output for:
 - `[server]` lines showing the server startup banner (ANTHROPIC_API_KEY status, listening URL)
 - `[client]` lines showing Vite is ready
 
@@ -40,4 +40,4 @@ Report:
 - Any errors visible in the output
 - The background task ID (so the user can check logs later)
 
-If the server isn't up after 20 seconds, wait another 15 seconds and check again before reporting failure. node --watch through concurrently can be slow to start on Windows.
+If the server isn't up after 6 seconds, wait another 10 seconds and check again before reporting failure.

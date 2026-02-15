@@ -9,8 +9,17 @@ import type {
   PendingApproval,
   PendingQuestion,
   SessionSettingsUpdate,
+  PermissionMode,
 } from '@clawd/shared';
 import type { CredentialStore } from '../settings/credential-store.js';
+
+function toSDKPermissionMode(mode: PermissionMode): 'default' | 'plan' | 'bypassPermissions' {
+  switch (mode) {
+    case 'plan': return 'plan';
+    case 'auto_accept': return 'bypassPermissions';
+    default: return 'default';
+  }
+}
 
 interface ManagedSession {
   info: SessionInfo;
@@ -130,6 +139,7 @@ export class SessionManager {
           includePartialMessages: true,
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           permissionMode: 'default',
+          allowDangerouslySkipPermissions: true,
           canUseTool: async (toolName, input) => {
             return this.handleToolApproval(session, toolName, input);
           },
@@ -171,16 +181,44 @@ export class SessionManager {
       return this.handleAskUserQuestion(session, input);
     }
 
-    // Permission mode checks
-    if (session.info.permissionMode === 'auto_accept') {
-      console.log(`[session:${session.info.id}] auto-approved: ${toolName}`);
-      return { behavior: 'allow', updatedInput: input };
-    }
-    if (session.info.permissionMode === 'plan') {
-      console.log(`[session:${session.info.id}] plan mode denied: ${toolName}`);
-      return { behavior: 'deny', message: 'Tool use denied — plan mode is active. Describe your plan instead.' };
+    // ExitPlanMode — show approval dialog, switch to normal only if approved
+    if (toolName === 'ExitPlanMode' && session.info.permissionMode === 'plan') {
+      const approvalId = uuid();
+      const approval: PendingApproval = {
+        id: approvalId,
+        toolName,
+        toolInput: input,
+        timestamp: new Date().toISOString(),
+      };
+
+      this.updateStatus(session, 'awaiting_approval');
+      this.emit(session.info.id, 'approval_request', approval);
+
+      const result = await Promise.race([
+        new Promise<{ behavior: 'allow' | 'deny'; message?: string }>((resolve) => {
+          session.pendingApproval = { approval, resolve };
+        }),
+        new Promise<{ behavior: 'deny'; message: string }>((resolve) =>
+          setTimeout(() => resolve({ behavior: 'deny', message: 'Approval timed out (5 min)' }), 5 * 60 * 1000)
+        ),
+      ]);
+
+      session.pendingApproval = null;
+      this.updateStatus(session, 'running');
+
+      if (result.behavior === 'allow') {
+        session.info.permissionMode = 'normal';
+        session.queryStream?.setPermissionMode('default');
+        this.emit(session.info.id, 'session_update', session.info);
+        console.log(`[session:${session.info.id}] exited plan mode → normal`);
+        return { behavior: 'allow', updatedInput: input };
+      }
+
+      console.log(`[session:${session.info.id}] plan exit denied — staying in plan mode`);
+      return { behavior: 'deny', message: result.message || 'Plan not approved' };
     }
 
+    // Show approval dialog
     const approvalId = uuid();
     const approval: PendingApproval = {
       id: approvalId,
@@ -284,12 +322,25 @@ export class SessionManager {
         }
 
         for (const block of toolBlocks) {
+          const name = (block as any).name;
+
+          // Detect EnterPlanMode from the message stream so it works even
+          // when canUseTool is skipped (e.g. bypassPermissions mode).
+          if (name === 'EnterPlanMode' && session.info.permissionMode !== 'plan') {
+            session.info.permissionMode = 'plan';
+            session.queryStream?.setPermissionMode('plan');
+            this.emit(session.info.id, 'session_update', session.info);
+            console.log(`[session:${session.info.id}] entered plan mode`);
+          }
+          // Note: ExitPlanMode is handled in canUseTool (only on approval),
+          // NOT here — switching here would exit plan mode before the user approves.
+
           this.addMessage(session, {
             id: (block as any).id || uuid(),
             sessionId: session.info.id,
             type: 'tool_call',
             content: JSON.stringify((block as any).input, null, 2),
-            toolName: (block as any).name,
+            toolName: name,
             toolInput: (block as any).input,
             timestamp: new Date().toISOString(),
           });
@@ -457,6 +508,7 @@ export class SessionManager {
     }
     if (settings.permissionMode !== undefined) {
       session.info.permissionMode = settings.permissionMode;
+      session.queryStream?.setPermissionMode(toSDKPermissionMode(settings.permissionMode));
     }
     if (settings.notificationsEnabled !== undefined) {
       session.info.notificationsEnabled = settings.notificationsEnabled;

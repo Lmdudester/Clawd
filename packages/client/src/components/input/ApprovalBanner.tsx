@@ -18,9 +18,9 @@ export function ApprovalBanner({ approval, onApprove }: Props) {
     <div className="border-t border-amber-500/30">
       <div className="p-3 bg-amber-500/10">
         <p className="text-sm font-medium text-amber-300">
-          Allow <span className="font-mono">{toolName}</span>?
+          {toolName === 'ExitPlanMode' ? 'Approve plan as-is?' : <>Allow <span className="font-mono">{toolName}</span>?</>}
         </p>
-        <p className="text-xs text-slate-400 truncate mt-0.5">{preview}</p>
+        {toolName !== 'ExitPlanMode' && <p className="text-xs text-slate-400 truncate mt-0.5">{preview}</p>}
       </div>
       <div className="flex">
         <button
