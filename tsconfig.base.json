@@ -11,6 +11,10 @@
     "sourceMap": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "paths": {
+      "@clawd/shared": ["./packages/shared/src/index.ts"],
+      "@clawd/shared/*": ["./packages/shared/src/*"]
+    }
   }
 }

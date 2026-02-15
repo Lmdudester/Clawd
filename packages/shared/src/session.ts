@@ -22,6 +22,7 @@ export interface SessionInfo {
   permissionMode: PermissionMode;
   model: string | null;
   notificationsEnabled: boolean;
+  contextUsage: ContextUsage | null;
 }
 
 export interface SessionMessage {
@@ -51,4 +52,17 @@ export interface PendingQuestion {
     multiSelect: boolean;
   }>;
   timestamp: string;
+}
+
+export interface ContextUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  contextWindow: number;
+  maxOutputTokens: number;
+  totalCostUsd: number;
+  numTurns: number;
+  durationMs: number;
+  durationApiMs: number;
 }

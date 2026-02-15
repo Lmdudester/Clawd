@@ -10,6 +10,7 @@ import type {
   PendingQuestion,
   SessionSettingsUpdate,
   PermissionMode,
+  ContextUsage,
 } from '@clawd/shared';
 import type { CredentialStore } from '../settings/credential-store.js';
 
@@ -92,6 +93,7 @@ export class SessionManager {
       permissionMode: 'normal',
       model: null,
       notificationsEnabled: false,
+      contextUsage: null,
     };
 
     const session: ManagedSession = {
@@ -433,6 +435,33 @@ export class SessionManager {
           `[session:${session.info.id}] result: ${isError ? 'ERROR' : 'ok'}, cost: $${(result.total_cost_usd ?? 0).toFixed(4)}`
         );
 
+        // Build context usage snapshot from SDK result data
+        const usage = result.usage;
+        const modelUsageMap = result.modelUsage as Record<string, any> | undefined;
+        let contextWindow = 0;
+        let maxOutputTokens = 0;
+        if (modelUsageMap) {
+          const firstModel = Object.values(modelUsageMap)[0];
+          if (firstModel) {
+            contextWindow = firstModel.contextWindow ?? 0;
+            maxOutputTokens = firstModel.maxOutputTokens ?? 0;
+          }
+        }
+
+        const contextUsage: ContextUsage = {
+          inputTokens: usage?.input_tokens ?? 0,
+          outputTokens: usage?.output_tokens ?? 0,
+          cacheReadInputTokens: usage?.cache_read_input_tokens ?? 0,
+          cacheCreationInputTokens: usage?.cache_creation_input_tokens ?? 0,
+          contextWindow,
+          maxOutputTokens,
+          totalCostUsd: result.total_cost_usd ?? 0,
+          numTurns: result.num_turns ?? 0,
+          durationMs: result.duration_ms ?? 0,
+          durationApiMs: result.duration_api_ms ?? 0,
+        };
+        session.info.contextUsage = contextUsage;
+
         // Surface command result text when no assistant messages were emitted this turn
         // (e.g. slash commands like /help, /model, /cost)
         const resultText = result.result ?? '';
@@ -451,6 +480,7 @@ export class SessionManager {
           result: resultText,
           costUsd: result.total_cost_usd ?? 0,
           isError,
+          contextUsage,
         });
         break;
       }

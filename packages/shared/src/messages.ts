@@ -35,6 +35,6 @@ export type ServerMessage =
   | { type: 'stream_end'; sessionId: string; messageId: string }
   | { type: 'approval_request'; sessionId: string; approval: import('./session.js').PendingApproval }
   | { type: 'question'; sessionId: string; question: import('./session.js').PendingQuestion }
-  | { type: 'result'; sessionId: string; result: string; costUsd: number; isError: boolean }
+  | { type: 'result'; sessionId: string; result: string; costUsd: number; isError: boolean; contextUsage: import('./session.js').ContextUsage | null }
   | { type: 'models_list'; sessionId: string; models: ModelInfo[] }
   | { type: 'error'; sessionId: string; message: string };

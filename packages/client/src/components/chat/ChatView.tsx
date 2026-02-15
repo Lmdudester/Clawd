@@ -11,6 +11,7 @@ import { ApprovalBanner } from '../input/ApprovalBanner';
 import { QuestionPanel } from '../input/QuestionPanel';
 import { SettingsDialog } from './SettingsDialog';
 import { MODE_THEME } from '../../lib/mode-theme';
+import { ContextUsageBar } from './ContextUsageBar';
 
 const EMPTY_MESSAGES: SessionMessage[] = [];
 
@@ -129,6 +130,11 @@ export function ChatView() {
           </svg>
         </button>
       </header>
+
+      {/* Context usage bar */}
+      {session?.contextUsage && (
+        <ContextUsageBar usage={session.contextUsage} />
+      )}
 
       {/* Messages */}
       <MessageList messages={messages} streamingText={streamingText} />
