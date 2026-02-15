@@ -130,6 +130,13 @@ export class SessionManager {
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           permissionMode: 'default',
           allowDangerouslySkipPermissions: true,
+          mcpServers: {
+            playwright: {
+              type: 'stdio',
+              command: 'npx',
+              args: ['@playwright/mcp', '--browser', 'chromium'],
+            },
+          },
           canUseTool: async (toolName, input) => {
             return this.handleToolApproval(session, toolName, input);
           },

@@ -3,6 +3,12 @@ FROM node:22-bookworm
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 
+# Install Playwright MCP server globally and Chromium + system deps
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+RUN npm install -g @playwright/mcp \
+    && npx playwright install --with-deps chromium \
+    && chmod -R o+rx /opt/playwright-browsers
+
 # Set working directory
 WORKDIR /app
 

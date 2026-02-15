@@ -7,6 +7,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends git \
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 
+# Install Playwright MCP server globally and Chromium + system deps
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+RUN npm install -g @playwright/mcp \
+    && npx playwright install --with-deps chromium \
+    && chmod -R o+rx /opt/playwright-browsers
+
 # Create app directory
 RUN mkdir -p /app/src
 
