@@ -21,6 +21,7 @@ export interface SessionInfo {
   totalCostUsd: number;
   permissionMode: PermissionMode;
   model: string | null;
+  notificationsEnabled: boolean;
 }
 
 export interface SessionMessage {

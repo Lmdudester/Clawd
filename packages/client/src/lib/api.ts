@@ -94,13 +94,4 @@ export const api = {
   getUsage: () =>
     request<UsageResponse>('/usage'),
 
-  // Push notifications
-  getVapidPublicKey: () =>
-    request<{ publicKey: string }>('/push/vapid-public-key'),
-
-  subscribePush: (subscription: PushSubscriptionJSON) =>
-    request<void>('/push/subscribe', { method: 'POST', body: JSON.stringify(subscription) }),
-
-  unsubscribePush: (endpoint: string) =>
-    request<void>('/push/subscribe', { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
 };

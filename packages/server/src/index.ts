@@ -14,8 +14,7 @@ import { createApp } from './app.js';
 import { SessionManager } from './sessions/session-manager.js';
 import { CredentialStore } from './settings/credential-store.js';
 import { ProjectFolderStore } from './settings/project-folders.js';
-import { VapidStore } from './push/vapid-store.js';
-import { PushManager } from './push/push-manager.js';
+import { SmsNotifier } from './sms/sms-notifier.js';
 import { setupWebSocket } from './ws/handler.js';
 import { config } from './config.js';
 import { networkInterfaces } from 'os';
@@ -48,14 +47,18 @@ switch (authStatus.method) {
     break;
 }
 
-const vapidStore = new VapidStore();
-const pushManager = new PushManager(vapidStore);
+const smsNotifier = new SmsNotifier();
+if (smsNotifier.enabled) {
+  console.log(`Notifications: enabled via ntfy (topic: ${config.ntfyTopic})`);
+} else {
+  console.log('Notifications: disabled (set NTFY_TOPIC to enable)');
+}
 
 const sessionManager = new SessionManager(credentialStore);
-const app = createApp(sessionManager, credentialStore, projectFolderStore, pushManager, vapidStore);
+const app = createApp(sessionManager, credentialStore, projectFolderStore);
 const server = createServer(app);
 
-setupWebSocket(server, sessionManager, pushManager);
+setupWebSocket(server, sessionManager, smsNotifier);
 
 server.listen(config.port, config.host, () => {
   console.log(`\n  Clawd server running on http://${config.host}:${config.port}`);

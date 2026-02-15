@@ -92,7 +92,7 @@ export function UsageCard() {
         <button
           onClick={refresh}
           disabled={loading}
-          className="p-1 rounded border border-green-600/50 text-green-600 hover:text-green-400 hover:border-green-400/50 transition-colors disabled:opacity-50"
+          className="p-1 rounded border border-blue-600/50 text-blue-500 hover:text-blue-400 hover:border-blue-400/50 transition-colors disabled:opacity-50"
           aria-label="Refresh usage"
         >
           <svg

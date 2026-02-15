@@ -3,15 +3,20 @@ import type { Server } from 'http';
 import { ConnectionManager } from './connection-manager.js';
 import { MessageRouter } from './message-router.js';
 import type { SessionManager } from '../sessions/session-manager.js';
-import type { PushManager } from '../push/push-manager.js';
+import type { SmsNotifier } from '../sms/sms-notifier.js';
 
-export function setupWebSocket(server: Server, sessionManager: SessionManager, pushManager?: PushManager): ConnectionManager {
+export function setupWebSocket(server: Server, sessionManager: SessionManager, smsNotifier?: SmsNotifier): ConnectionManager {
   const wss = new WebSocketServer({ server, path: '/ws' });
   const connectionManager = new ConnectionManager();
   const messageRouter = new MessageRouter(sessionManager, connectionManager);
 
   // Debounce result push notifications — only send if session stays idle for 3s
   const pendingResultPush = new Map<string, ReturnType<typeof setTimeout>>();
+
+  // Only send SMS when notifications are enabled AND no one is viewing the session
+  const shouldSms = (sessionId: string) =>
+    sessionManager.getSession(sessionId)?.info.notificationsEnabled &&
+    !connectionManager.hasSubscribers(sessionId);
 
   // Wire session events to WebSocket broadcasts
   sessionManager.onEvent((sessionId, event, data) => {
@@ -32,24 +37,34 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, p
       case 'stream':
         connectionManager.broadcast(sessionId, { type: 'stream', sessionId, ...(data as object) });
         break;
-      case 'approval_request':
+      case 'approval_request': {
         connectionManager.broadcast(sessionId, { type: 'approval_request', sessionId, approval: data });
-        pushManager?.sendNotification('Approval Needed', `${(data as any).toolName} requires approval`, `/session/${sessionId}`);
+        if (shouldSms(sessionId)) {
+          const sessionName = sessionManager.getSession(sessionId)?.info.name ?? sessionId;
+          smsNotifier?.sendNotification('Approval Needed', `Session "${sessionName}" needs approval`);
+        }
         break;
-      case 'question':
+      }
+      case 'question': {
         connectionManager.broadcast(sessionId, { type: 'question', sessionId, question: data });
-        pushManager?.sendNotification('Claude has a question', 'Tap to respond', `/session/${sessionId}`);
+        if (shouldSms(sessionId)) {
+          const sessionName = sessionManager.getSession(sessionId)?.info.name ?? sessionId;
+          smsNotifier?.sendNotification('Question', `Session "${sessionName}" has a question`);
+        }
         break;
+      }
       case 'result': {
         connectionManager.broadcast(sessionId, { type: 'result', sessionId, ...(data as object) });
         // Clear any previous pending push for this session, then schedule a new one
         if (pendingResultPush.has(sessionId)) {
           clearTimeout(pendingResultPush.get(sessionId));
         }
-        const resultText = (data as any).result ?? 'Claude finished working';
+        const sessionName = sessionManager.getSession(sessionId)?.info.name ?? sessionId;
         const timeout = setTimeout(() => {
           pendingResultPush.delete(sessionId);
-          pushManager?.sendNotification('Task Complete', resultText, `/session/${sessionId}`);
+          if (shouldSms(sessionId)) {
+            smsNotifier?.sendNotification('Task Complete', `Session "${sessionName}" is idle`);
+          }
         }, 3000);
         pendingResultPush.set(sessionId, timeout);
         break;

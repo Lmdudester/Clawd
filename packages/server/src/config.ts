@@ -13,5 +13,6 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || randomBytes(32).toString('hex'),
   credentialsPath: process.env.CREDENTIALS_PATH || resolve(projectRoot, 'credentials.json'),
   claudeAuthPath: resolve(projectRoot, 'claude-auth.json'),
-  vapidKeysPath: resolve(projectRoot, 'vapid-keys.json'),
+  get ntfyTopic() { return process.env.NTFY_TOPIC || ''; },
+  get ntfyServer() { return process.env.NTFY_SERVER || 'https://ntfy.sh'; },
 };

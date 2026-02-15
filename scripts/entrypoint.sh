@@ -20,4 +20,12 @@ elif [ -n "$GIT_CREDENTIALS_URL" ]; then
     git config --global credential.helper store
 fi
 
+# --- Pull latest code and rebuild on startup ---
+echo "[STARTUP] Pulling latest code..."
+git pull --ff-only || echo "[STARTUP] git pull failed, continuing with existing code"
+echo "[STARTUP] Installing dependencies..."
+npm install --no-audit --no-fund
+echo "[STARTUP] Building project..."
+npm run build
+
 exec "$@"

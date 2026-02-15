@@ -79,6 +79,7 @@ export class SessionManager {
       totalCostUsd: 0,
       permissionMode: 'normal',
       model: null,
+      notificationsEnabled: false,
     };
 
     const session: ManagedSession = {
@@ -456,6 +457,9 @@ export class SessionManager {
     }
     if (settings.permissionMode !== undefined) {
       session.info.permissionMode = settings.permissionMode;
+    }
+    if (settings.notificationsEnabled !== undefined) {
+      session.info.notificationsEnabled = settings.notificationsEnabled;
     }
 
     this.emit(sessionId, 'session_update', session.info);

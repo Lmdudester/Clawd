@@ -8,18 +8,3 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>
 );
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js');
-  navigator.serviceWorker.addEventListener('message', (event) => {
-    if (event.data?.type === 'sw-log') {
-      console.log(event.data.message);
-    }
-  });
-}
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    navigator.clearAppBadge?.();
-  }
-});

@@ -3,6 +3,7 @@
 export interface SessionSettingsUpdate {
   name?: string;
   permissionMode?: import('./session.js').PermissionMode;
+  notificationsEnabled?: boolean;
 }
 
 export interface ModelInfo {

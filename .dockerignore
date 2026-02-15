@@ -3,5 +3,4 @@ dist
 .env
 credentials.json
 *.log
-.git
 .claude

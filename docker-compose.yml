@@ -12,6 +12,9 @@ services:
       - CLAWD_PORT=3000
       - HOST_DRIVE_PREFIX=/host/c
       # ANTHROPIC_API_KEY is optional when using OAuth credentials via Settings
+      # --- Push notifications via ntfy (optional) ---
+      - NTFY_TOPIC
+      - NTFY_SERVER
       # --- Git push support (optional) ---
       - GIT_USER_NAME
       - GIT_USER_EMAIL
