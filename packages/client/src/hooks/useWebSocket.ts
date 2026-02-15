@@ -64,6 +64,11 @@ export function useWebSocketProvider(): { send: SendFn } {
           break;
         case 'messages':
           addMessages(message.sessionId, message.messages);
+          // Clear streaming tokens when a complete assistant message arrives,
+          // so the streaming bubble doesn't linger alongside the real message
+          if (message.messages.some((m: any) => m.type === 'assistant')) {
+            clearSessionStreamTokens(message.sessionId);
+          }
           break;
         case 'stream':
           appendStreamToken(message.sessionId, message.messageId, message.token);
