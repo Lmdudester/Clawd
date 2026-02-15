@@ -35,6 +35,26 @@ export class ConnectionManager {
     }
   }
 
+  // Broadcast a message to all authenticated clients (regardless of session subscription)
+  broadcastAll(message: object): void {
+    const data = JSON.stringify(message);
+    for (const client of this.clients.values()) {
+      if (client.ws.readyState === 1) {
+        client.ws.send(data);
+      }
+    }
+  }
+
+  // Check if any connected client has an open WebSocket subscribed to this session
+  hasSubscribers(sessionId: string): boolean {
+    for (const client of this.clients.values()) {
+      if (client.subscriptions.has(sessionId) && client.ws.readyState === 1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   isAuthenticated(ws: WebSocket): boolean {
     return this.clients.has(ws);
   }

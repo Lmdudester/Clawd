@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { SessionInfo, PermissionMode, ModelInfo } from '@clawd/shared';
+import { useNotifications } from '../../hooks/useNotifications';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -19,6 +20,7 @@ const PERMISSION_MODES: { value: PermissionMode; label: string; description: str
 
 export function SettingsDialog({ open, onClose, session, onUpdateSettings, onChangeModel, availableModels, onRequestModels }: SettingsDialogProps) {
   const [name, setName] = useState(session.name);
+  const { permission, enabled, loading: notifLoading, requestPermission, unsubscribe } = useNotifications();
 
   useEffect(() => {
     if (open) {
@@ -122,6 +124,34 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onCha
               ))}
             </div>
           </div>
+
+          {/* Notifications */}
+          {permission !== 'unsupported' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">Push Notifications</label>
+              {permission === 'denied' ? (
+                <div className="px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-400 text-sm">
+                  Blocked in browser settings
+                </div>
+              ) : enabled ? (
+                <button
+                  onClick={unsubscribe}
+                  disabled={notifLoading}
+                  className="w-full py-2.5 bg-green-600/20 border border-green-600/40 text-green-400 rounded-lg text-sm font-medium hover:bg-green-600/30 transition-colors disabled:opacity-50"
+                >
+                  {notifLoading ? 'Updating...' : 'Enabled — Tap to Disable'}
+                </button>
+              ) : (
+                <button
+                  onClick={requestPermission}
+                  disabled={notifLoading}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {notifLoading ? 'Enabling...' : 'Enable Notifications'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <button

@@ -14,6 +14,8 @@ import { createApp } from './app.js';
 import { SessionManager } from './sessions/session-manager.js';
 import { CredentialStore } from './settings/credential-store.js';
 import { ProjectFolderStore } from './settings/project-folders.js';
+import { VapidStore } from './push/vapid-store.js';
+import { PushManager } from './push/push-manager.js';
 import { setupWebSocket } from './ws/handler.js';
 import { config } from './config.js';
 import { networkInterfaces } from 'os';
@@ -46,11 +48,14 @@ switch (authStatus.method) {
     break;
 }
 
+const vapidStore = new VapidStore();
+const pushManager = new PushManager(vapidStore);
+
 const sessionManager = new SessionManager(credentialStore);
-const app = createApp(sessionManager, credentialStore, projectFolderStore);
+const app = createApp(sessionManager, credentialStore, projectFolderStore, pushManager, vapidStore);
 const server = createServer(app);
 
-setupWebSocket(server, sessionManager);
+setupWebSocket(server, sessionManager, pushManager);
 
 server.listen(config.port, config.host, () => {
   console.log(`\n  Clawd server running on http://${config.host}:${config.port}`);

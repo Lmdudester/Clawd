@@ -3,6 +3,8 @@ dist/
 .env
 credentials.json
 claude-auth.json
+vapid-keys.json
+push-subscriptions.json
 *.log
 .DS_Store
 

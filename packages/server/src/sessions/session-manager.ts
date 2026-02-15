@@ -293,6 +293,7 @@ export class SessionManager {
             timestamp: new Date().toISOString(),
           });
         }
+
         break;
       }
 

@@ -5,13 +5,16 @@ import { authRouter } from './routes/auth.js';
 import { createSessionRoutes } from './routes/sessions.js';
 import { createSettingsRoutes } from './routes/settings.js';
 import { createUsageRoutes } from './routes/usage.js';
+import { createPushRoutes } from './routes/push.js';
 import type { SessionManager } from './sessions/session-manager.js';
 import type { CredentialStore } from './settings/credential-store.js';
 import type { ProjectFolderStore } from './settings/project-folders.js';
+import type { PushManager } from './push/push-manager.js';
+import type { VapidStore } from './push/vapid-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export function createApp(sessionManager: SessionManager, credentialStore: CredentialStore, projectFolderStore: ProjectFolderStore) {
+export function createApp(sessionManager: SessionManager, credentialStore: CredentialStore, projectFolderStore: ProjectFolderStore, pushManager: PushManager, vapidStore: VapidStore) {
   const app = express();
 
   app.use(express.json());
@@ -21,6 +24,7 @@ export function createApp(sessionManager: SessionManager, credentialStore: Crede
   app.use('/api/sessions', createSessionRoutes(sessionManager));
   app.use('/api/settings', createSettingsRoutes(credentialStore, projectFolderStore));
   app.use('/api/usage', createUsageRoutes(credentialStore));
+  app.use('/api/push', createPushRoutes(pushManager, vapidStore));
 
   // Serve static client build in production
   const clientDist = join(__dirname, '../../client/dist');
