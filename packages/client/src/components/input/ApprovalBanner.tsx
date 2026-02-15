@@ -1,4 +1,6 @@
 import type { PendingApproval } from '@clawd/shared';
+import { getToolSummary, getToolConfig } from '../../lib/toolFormatters';
+import { ToolIcon } from '../chat/ToolIcon';
 
 interface Props {
   approval: PendingApproval;
@@ -8,18 +10,22 @@ interface Props {
 
 export function ApprovalBanner({ approval, onApprove, onInterrupt }: Props) {
   const toolName = approval.toolName;
-  const preview =
-    toolName === 'Bash'
-      ? (approval.toolInput as any).command
-      : toolName === 'Edit' || toolName === 'Read' || toolName === 'Write'
-      ? (approval.toolInput as any).file_path
-      : JSON.stringify(approval.toolInput).slice(0, 100);
+  const config = getToolConfig(toolName);
+  const preview = getToolSummary(toolName, approval.toolInput) ||
+    JSON.stringify(approval.toolInput).slice(0, 100);
 
   return (
     <div className="border-t border-amber-500/30">
       <div className="p-3 bg-amber-500/10">
-        <p className="text-sm font-medium text-amber-300">
-          {toolName === 'ExitPlanMode' ? 'Approve plan as-is?' : <>Allow <span className="font-mono">{toolName}</span>?</>}
+        <p className="text-sm font-medium text-amber-300 flex items-center gap-2">
+          {toolName === 'ExitPlanMode' ? (
+            'Approve plan as-is?'
+          ) : (
+            <>
+              <ToolIcon toolName={toolName} className={`w-4 h-4 ${config.labelClass}`} />
+              Allow <span className="font-mono">{toolName}</span>?
+            </>
+          )}
         </p>
         {toolName !== 'ExitPlanMode' && <p className="text-xs text-slate-400 truncate mt-0.5">{preview}</p>}
       </div>

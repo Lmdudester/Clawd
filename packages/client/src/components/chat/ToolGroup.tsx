@@ -1,39 +1,60 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import type { SessionMessage } from '@clawd/shared';
-import { MessageBubble } from './MessageBubble';
+import { ToolCallCard } from './ToolCallCard';
+import { ToolResultCard } from './ToolResultCard';
 
 interface Props {
   messages: SessionMessage[];
 }
 
-export function ToolGroup({ messages }: Props) {
-  const [expanded, setExpanded] = useState(false);
+interface ToolPair {
+  call: SessionMessage;
+  result?: SessionMessage;
+}
 
-  const toolCalls = messages.filter((m) => m.type === 'tool_call');
-  const callCount = toolCalls.length;
-  const uniqueTools = [...new Set(toolCalls.map((m) => m.toolName).filter(Boolean))];
+function pairToolMessages(messages: SessionMessage[]): (ToolPair | SessionMessage)[] {
+  const pairs: (ToolPair | SessionMessage)[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    const msg = messages[i];
+    if (msg.type === 'tool_call') {
+      const pair: ToolPair = { call: msg };
+      if (i + 1 < messages.length && messages[i + 1].type === 'tool_result') {
+        pair.result = messages[i + 1];
+        i += 2;
+      } else {
+        i++;
+      }
+      pairs.push(pair);
+    } else if (msg.type === 'tool_result') {
+      // Orphaned result — render standalone
+      pairs.push(msg);
+      i++;
+    } else {
+      i++;
+    }
+  }
+  return pairs;
+}
+
+export function ToolGroup({ messages }: Props) {
+  const pairs = useMemo(() => pairToolMessages(messages), [messages]);
 
   return (
-    <div className="mx-4 my-1">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/40 border border-slate-600 rounded-md text-sm text-white hover:text-white hover:bg-slate-900/50 transition-colors w-fit max-w-full"
-      >
-        <span className={`transition-transform text-lg ${expanded ? 'rotate-90' : ''}`}>&#9654;</span>
-        <span className="text-white">
-          {callCount} tool call{callCount !== 1 ? 's' : ''}
-        </span>
-        {!expanded && uniqueTools.length > 0 && (
-          <span className="font-mono text-slate-100">{uniqueTools.join(', ')}</span>
-        )}
-      </button>
-      {expanded && (
-        <div className="mt-1 ml-1 pl-2 border-l border-slate-600">
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
-          ))}
-        </div>
-      )}
+    <div className="space-y-1">
+      {pairs.map((item) => {
+        if ('call' in item) {
+          return (
+            <ToolCallCard
+              key={item.call.id}
+              message={item.call}
+              result={item.result}
+            />
+          );
+        }
+        // Orphaned tool_result
+        return <ToolResultCard key={item.id} message={item} />;
+      })}
     </div>
   );
 }

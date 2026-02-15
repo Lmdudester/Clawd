@@ -4,10 +4,10 @@ import { ToolCallCard } from './ToolCallCard';
 import { ToolResultCard } from './ToolResultCard';
 
 export function MessageBubble({ message }: { message: SessionMessage }) {
+  // Fallback — tool messages are normally rendered through ToolGroup
   if (message.type === 'tool_call') {
     return <ToolCallCard message={message} />;
   }
-
   if (message.type === 'tool_result') {
     return <ToolResultCard message={message} />;
   }
