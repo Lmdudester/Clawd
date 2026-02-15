@@ -2,13 +2,13 @@ services:
   clawd:
     build: .
     ports:
-      - "3000:3000"
+      - "4000:4000"
     volumes:
       - /c:/host/c
       - ./credentials.json:/app/credentials.json:ro
     environment:
       - CLAWD_HOST=0.0.0.0
-      - CLAWD_PORT=3000
+      - CLAWD_PORT=4000
       - HOST_DRIVE_PREFIX=/host/c
       # --- Push notifications via ntfy (optional) ---
       - NTFY_TOPIC

@@ -123,6 +123,8 @@ export class SessionManager {
       delete cleanEnv.NODE_OPTIONS;
       delete cleanEnv.VSCODE_INSPECTOR_OPTIONS;
       delete cleanEnv.CLAUDECODE;
+      delete cleanEnv.CLAWD_PORT;
+      delete cleanEnv.CLAWD_HOST;
 
       const queryStream = query({
         prompt: session.channel as AsyncIterable<any>,
@@ -505,14 +507,29 @@ export class SessionManager {
 
     console.log(`[session:${sessionId}] interrupting (was ${status})`);
 
-    // Resolve any pending approval/question so the awaiting promises settle
+    // Resolve any pending approval/question so the awaiting promises settle.
+    // We must let the denial propagate through the SDK's async pipeline
+    // (microtask chain: Promise.race → canUseTool return → control_response write)
+    // BEFORE sending the interrupt, otherwise the interrupt reaches the CLI first
+    // and the conversation is left with a dangling tool_use block — causing
+    // "tool_use ids must be unique" errors on the next API call.
+    let hadPending = false;
     if (session.pendingApproval) {
       session.pendingApproval.resolve({ behavior: 'deny', message: 'Interrupted by user' });
       session.pendingApproval = null;
+      hadPending = true;
     }
     if (session.pendingQuestion) {
       session.pendingQuestion.resolve({});
       session.pendingQuestion = null;
+      hadPending = true;
+    }
+
+    if (hadPending) {
+      // setTimeout(0) defers to the macrotask queue, which runs after all pending
+      // microtasks — guaranteeing the deny/answer control_response has been written
+      // to the CLI's stdin before we send the interrupt control_request.
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
     // Gracefully interrupt the current turn — the SDK will emit a `result`

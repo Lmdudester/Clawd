@@ -60,7 +60,7 @@ ENV HOME=/home/node
 RUN git config --global --add safe.directory '*'
 
 # Expose the server port
-EXPOSE 3000
+EXPOSE 4000
 
 # Start the server (serves built client as static files)
 ENTRYPOINT ["/entrypoint.sh"]

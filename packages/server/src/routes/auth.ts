@@ -1,10 +1,19 @@
 import { Router } from 'express';
 import { readFileSync } from 'fs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import { config } from '../config.js';
 import type { LoginRequest, LoginResponse, ErrorResponse } from '@clawd/shared';
 
 const router = Router();
+
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again later' },
+});
 
 interface Credentials {
   users: Array<{ username: string; password: string }>;
@@ -19,7 +28,7 @@ function loadCredentials(): Credentials {
   }
 }
 
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   const { username, password } = req.body as LoginRequest;
 
   if (!username || !password) {

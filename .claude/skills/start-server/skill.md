@@ -21,7 +21,7 @@ Run `netstat -ano | grep -E ":(3050|3051) " | grep LISTEN` to check if the dev p
 Run the following as a **background bash task**:
 
 ```
-cd /c/Users/lmdud/OneDrive/Documents/Programming/Clawd && npm run dev 2>&1
+cd "$(git rev-parse --show-toplevel)" && npm run dev 2>&1
 ```
 
 ## 3. Wait for startup

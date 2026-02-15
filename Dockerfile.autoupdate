@@ -47,6 +47,6 @@ USER node
 ENV HOME=/home/node
 RUN git config --global --add safe.directory '*'
 
-EXPOSE 3000
+EXPOSE 4000
 
 ENTRYPOINT ["/entrypoint.sh"]
