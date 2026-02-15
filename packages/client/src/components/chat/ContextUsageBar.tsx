@@ -48,7 +48,7 @@ export function ContextUsageBar({ usage }: { usage: ContextUsage }) {
           />
         </div>
         <span className="shrink-0">
-          {contextPct.toFixed(0)}% context
+          {Math.min(contextPct, 100).toFixed(0)}% context
         </span>
         <span className="shrink-0 text-slate-500">|</span>
         <span className="shrink-0">{formatCost(usage.totalCostUsd)}</span>
