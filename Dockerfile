@@ -3,9 +3,6 @@ FROM node:22-bookworm
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 
-# Pre-create Claude config to bypass onboarding prompt when using OAuth
-RUN mkdir -p /root/.claude && echo '{"hasCompletedOnboarding":true}' > /root/.claude.json
-
 # Set working directory
 WORKDIR /app
 
@@ -27,6 +24,14 @@ RUN npm run build
 # Copy entrypoint and fix line endings
 COPY scripts/entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
+# Set up non-root user (Claude Code rejects --dangerously-skip-permissions as root)
+RUN mkdir -p /home/node/.claude \
+    && echo '{"hasCompletedOnboarding":true}' > /home/node/.claude.json \
+    && chown -R node:node /app /home/node/.claude /home/node/.claude.json
+
+USER node
+ENV HOME=/home/node
 
 # Expose the server port
 EXPOSE 3000

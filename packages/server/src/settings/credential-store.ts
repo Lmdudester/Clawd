@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, unlinkSync, symlinkSync, existsSync, readdirSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
+import { homedir } from 'os';
 import { config } from '../config.js';
 import type { AuthStatusResponse } from '@clawd/shared';
 
@@ -81,14 +82,15 @@ export class CredentialStore {
 
   private setupSymlink(claudeDir: string): void {
     const targetFile = join(claudeDir, '.credentials.json');
-    const rootClaudeDir = '/root/.claude';
-    const symlinkPath = join(rootClaudeDir, '.credentials.json');
+    const home = homedir();
+    const homeClaudeDir = join(home, '.claude');
+    const symlinkPath = join(homeClaudeDir, '.credentials.json');
 
-    // Ensure /root/.claude exists
-    mkdirSync(rootClaudeDir, { recursive: true });
+    // Ensure ~/.claude exists
+    mkdirSync(homeClaudeDir, { recursive: true });
 
     // Ensure onboarding is bypassed
-    const dotClaudeJson = '/root/.claude.json';
+    const dotClaudeJson = join(home, '.claude.json');
     if (!existsSync(dotClaudeJson)) {
       writeFileSync(dotClaudeJson, JSON.stringify({ hasCompletedOnboarding: true }));
     }
@@ -172,7 +174,7 @@ export class CredentialStore {
   // Clear stored credentials path and remove symlink.
   clear(): void {
     if (config.hostDrivePrefix) {
-      try { unlinkSync('/root/.claude/.credentials.json'); } catch {}
+      try { unlinkSync(join(homedir(), '.claude', '.credentials.json')); } catch {}
     }
     this.storedAuth = null;
     this.save();

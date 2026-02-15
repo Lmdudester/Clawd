@@ -7,9 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends git \
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 
-# Pre-create Claude config to bypass onboarding prompt when using OAuth
-RUN mkdir -p /root/.claude && echo '{"hasCompletedOnboarding":true}' > /root/.claude.json
-
 # Create app directory
 RUN mkdir -p /app/src
 
@@ -18,6 +15,14 @@ WORKDIR /app
 # Copy entrypoint and fix line endings
 COPY scripts/entrypoint-autoupdate.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
+# Set up non-root user (Claude Code rejects --dangerously-skip-permissions as root)
+RUN mkdir -p /home/node/.claude \
+    && echo '{"hasCompletedOnboarding":true}' > /home/node/.claude.json \
+    && chown -R node:node /app /home/node/.claude /home/node/.claude.json
+
+USER node
+ENV HOME=/home/node
 
 EXPOSE 3000
 

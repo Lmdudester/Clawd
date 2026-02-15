@@ -10,13 +10,13 @@ fi
 
 if [ -n "$GITHUB_TOKEN" ]; then
     echo "[STARTUP] Configuring GitHub credentials..."
-    printf 'https://git:%s@github.com\n' "$GITHUB_TOKEN" > /root/.git-credentials
-    chmod 600 /root/.git-credentials
+    printf 'https://git:%s@github.com\n' "$GITHUB_TOKEN" > "$HOME/.git-credentials"
+    chmod 600 "$HOME/.git-credentials"
     git config --global credential.helper store
 elif [ -n "$GIT_CREDENTIALS_URL" ]; then
     echo "[STARTUP] Configuring git credentials..."
-    printf '%s\n' "$GIT_CREDENTIALS_URL" > /root/.git-credentials
-    chmod 600 /root/.git-credentials
+    printf '%s\n' "$GIT_CREDENTIALS_URL" > "$HOME/.git-credentials"
+    chmod 600 "$HOME/.git-credentials"
     git config --global credential.helper store
 fi
 
