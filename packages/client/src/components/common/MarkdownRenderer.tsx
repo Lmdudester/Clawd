@@ -12,7 +12,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
           const isInline = !match;
           if (isInline) {
             return (
-              <code className="bg-slate-700/50 px-1.5 py-0.5 rounded text-sm text-blue-300" {...props}>
+              <code className="bg-slate-700/50 px-1.5 py-0.5 rounded text-sm text-blue-300 break-all" {...props}>
                 {children}
               </code>
             );
