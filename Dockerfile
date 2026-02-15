@@ -1,5 +1,24 @@
 FROM node:22-bookworm
 
+# ── System packages ──────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 \
+        python3-pip \
+        python3-venv \
+        python3-dev \
+        sqlite3 \
+        ripgrep \
+        tree \
+        jq \
+        procps \
+        lsof \
+        zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── pnpm via corepack (bundled with Node.js 22) ─────────────────
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 
