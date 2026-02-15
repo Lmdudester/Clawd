@@ -1,10 +1,12 @@
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
+import remarkGfm from 'remark-gfm';
 import { CodeBlock } from './CodeBlock';
 
 export function MarkdownRenderer({ content }: { content: string }) {
   return (
     <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeHighlight]}
       components={{
         code({ className, children, ...props }) {
@@ -40,6 +42,24 @@ export function MarkdownRenderer({ content }: { content: string }) {
         h3({ children }) { return <h3 className="text-base font-bold mb-1">{children}</h3>; },
         blockquote({ children }) {
           return <blockquote className="border-l-2 border-slate-600 pl-3 italic text-slate-400">{children}</blockquote>;
+        },
+        table({ children }) {
+          return <table className="table-auto border-collapse border border-slate-600 my-2 w-full text-sm">{children}</table>;
+        },
+        thead({ children }) {
+          return <thead className="bg-slate-700/50">{children}</thead>;
+        },
+        tbody({ children }) {
+          return <tbody>{children}</tbody>;
+        },
+        tr({ children }) {
+          return <tr className="border-b border-slate-700">{children}</tr>;
+        },
+        th({ children }) {
+          return <th className="border border-slate-600 px-3 py-1.5 text-left font-semibold">{children}</th>;
+        },
+        td({ children }) {
+          return <td className="border border-slate-600 px-3 py-1.5">{children}</td>;
         },
       }}
     >
