@@ -6,8 +6,8 @@ RUN npm install -g @anthropic-ai/claude-code
 # Install Playwright MCP server globally and Chromium + system deps
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 RUN npm install -g @playwright/mcp \
-    && npx playwright install --with-deps chromium \
-    && chmod -R o+rx /opt/playwright-browsers
+    && npx --package=@playwright/mcp playwright install --with-deps chromium \
+    && chmod -R o+rwx /opt/playwright-browsers
 
 # Set working directory
 WORKDIR /app
