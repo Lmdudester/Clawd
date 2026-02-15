@@ -31,6 +31,10 @@ const DEFAULT_CONFIG: ToolConfig = {
 
 export function getToolConfig(toolName: string | undefined): ToolConfig {
   if (!toolName) return DEFAULT_CONFIG;
+  if (toolName.startsWith('mcp__playwright__')) {
+    const action = toolName.replace('mcp__playwright__', '').replace(/_/g, ' ');
+    return { label: action, borderClass: 'border-l-sky-500', bgClass: 'bg-sky-950/30', labelClass: 'text-sky-400' };
+  }
   return TOOL_CONFIGS[toolName] ?? { ...DEFAULT_CONFIG, label: toolName };
 }
 
@@ -85,8 +89,19 @@ export function getToolSummary(
       return inp.skill || '';
     case 'NotebookEdit':
       return shortenPath(inp.notebook_path || '');
-    default:
+    default: {
+      if (toolName.startsWith('mcp__playwright__')) {
+        const action = toolName.replace('mcp__playwright__', '');
+        if (action === 'browser_navigate') return inp.url || '';
+        if (action === 'browser_click') return inp.element || inp.ref || '';
+        if (action === 'browser_type') return inp.text || '';
+        if (action === 'browser_snapshot' || action === 'browser_screenshot') return '';
+        // Fallback: show first string-valued input
+        const firstStr = Object.values(inp).find((v): v is string => typeof v === 'string');
+        return firstStr || '';
+      }
       return '';
+    }
   }
 }
 

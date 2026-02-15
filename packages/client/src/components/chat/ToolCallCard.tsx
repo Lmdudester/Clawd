@@ -97,8 +97,12 @@ function ToolDetail({
       return <WebFetchDetail input={inp} />;
     case 'WebSearch':
       return <WebSearchDetail input={inp} />;
-    default:
+    default: {
+      if (toolName.startsWith('mcp__playwright__')) {
+        return <PlaywrightDetail toolName={toolName} input={inp} />;
+      }
       return <DefaultDetail input={inp} />;
+    }
   }
 }
 
@@ -252,6 +256,83 @@ function WebSearchDetail({ input }: { input: Record<string, any> }) {
   return (
     <div className="px-3 py-2">
       <p className="text-sm text-slate-200">{input.query}</p>
+    </div>
+  );
+}
+
+function PlaywrightDetail({ toolName, input }: { toolName: string; input: Record<string, any> }) {
+  const action = toolName.replace('mcp__playwright__', '');
+
+  if (action === 'browser_navigate') {
+    return (
+      <div className="px-3 py-2 space-y-1">
+        {input.url && (
+          <p className="text-sm font-mono text-sky-300 truncate">{input.url}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (action === 'browser_click') {
+    return (
+      <div className="px-3 py-2 space-y-1">
+        {(input.element || input.ref) && (
+          <p className="text-sm text-slate-200">
+            <code className="bg-slate-800 px-1.5 py-0.5 rounded text-sky-300 font-mono text-xs">
+              {input.element || input.ref}
+            </code>
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (action === 'browser_type') {
+    return (
+      <div className="px-3 py-2 space-y-1">
+        {(input.element || input.ref) && (
+          <p className="text-sm text-slate-200">
+            <code className="bg-slate-800 px-1.5 py-0.5 rounded text-sky-300 font-mono text-xs">
+              {input.element || input.ref}
+            </code>
+          </p>
+        )}
+        {input.text && (
+          <p className="text-sm text-slate-300">"{input.text}"</p>
+        )}
+      </div>
+    );
+  }
+
+  if (action === 'browser_snapshot') {
+    return (
+      <div className="px-3 py-2">
+        <p className="text-sm text-slate-400">Capturing page snapshot</p>
+      </div>
+    );
+  }
+
+  if (action === 'browser_screenshot') {
+    return (
+      <div className="px-3 py-2">
+        <p className="text-sm text-slate-400">Capturing screenshot</p>
+      </div>
+    );
+  }
+
+  // Unknown Playwright action — show key params as chips, fall back to DefaultDetail
+  const entries = Object.entries(input).filter(([, v]) => v != null);
+  if (entries.length === 0) return <DefaultDetail input={input} />;
+
+  return (
+    <div className="px-3 py-2">
+      <div className="flex gap-2 flex-wrap">
+        {entries.map(([key, value]) => (
+          <span key={key} className="text-xs bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+            {key}: {typeof value === 'string' ? value : JSON.stringify(value)}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
