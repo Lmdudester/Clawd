@@ -21,17 +21,38 @@ elif [ -n "$GIT_CREDENTIALS_URL" ]; then
 fi
 
 # --- Allow git to operate on volumes with different ownership ---
-# Mounted host directories appear owned by root inside the container while
-# we run as node. This tells git to trust all directories, which is safe
-# because we only mount directories the host user controls.
 git config --global --add safe.directory '*'
 
-# --- Pull latest code and rebuild on startup ---
-echo "[STARTUP] Pulling latest code..."
-git pull --ff-only || echo "[STARTUP] git pull failed, continuing with existing code"
+# --- Host ~/.claude directory symlink (optional) ---
+if [ -n "$HOST_CLAUDE_DIR" ]; then
+    if [ -d "$HOST_CLAUDE_DIR" ]; then
+        echo "[STARTUP] Linking ~/.claude -> $HOST_CLAUDE_DIR"
+        rm -rf "$HOME/.claude"
+        ln -sf "$HOST_CLAUDE_DIR" "$HOME/.claude"
+    else
+        echo "[STARTUP] WARNING: HOST_CLAUDE_DIR=$HOST_CLAUDE_DIR not found"
+    fi
+fi
+
+echo "=== Clawd Auto-Update Startup ==="
+
+# Clean up any previous source directory
+if [ -d /app/src ]; then
+    echo "[STARTUP] Cleaning up previous source..."
+    chmod -R u+rwX /app/src 2>/dev/null || true
+    rm -rf /app/src
+fi
+
+echo "[STARTUP] Cloning repository..."
+git clone --depth 1 --branch "${GIT_BRANCH:-main}" "${GIT_REPO_URL:-https://github.com/Lmdudester/Clawd.git}" /app/src
+
+cd /app/src
+
 echo "[STARTUP] Installing dependencies..."
-npm install --no-audit --no-fund
-echo "[STARTUP] Building project..."
+npm ci
+
+echo "[STARTUP] Building..."
 npm run build
 
-exec "$@"
+echo "[STARTUP] Starting Clawd..."
+exec npm start

@@ -2,6 +2,7 @@ FROM node:22-bookworm
 
 # ── System packages ──────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
         python3 \
         python3-pip \
         python3-venv \
@@ -28,23 +29,10 @@ RUN npm install -g @playwright/mcp \
     && npx --package=@playwright/mcp playwright install --with-deps chromium \
     && chmod -R o+rwx /opt/playwright-browsers
 
-# Set working directory
+# Create app directory
+RUN mkdir -p /app/src
+
 WORKDIR /app
-
-# Copy package files for dependency installation
-COPY package.json package-lock.json* ./
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/server/package.json ./packages/server/
-COPY packages/client/package.json ./packages/client/
-
-# Install dependencies
-RUN npm install
-
-# Copy source code
-COPY . .
-
-# Build shared types, then client, then server
-RUN npm run build
 
 # Copy entrypoint and fix line endings
 COPY scripts/entrypoint.sh /entrypoint.sh
@@ -59,9 +47,6 @@ USER node
 ENV HOME=/home/node
 RUN git config --global --add safe.directory '*'
 
-# Expose the server port
 EXPOSE 4000
 
-# Start the server (serves built client as static files)
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["npm", "start"]

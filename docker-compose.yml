@@ -1,20 +1,20 @@
 services:
   clawd:
     build: .
+    container_name: clawd
     ports:
       - "4000:4000"
     volumes:
       - /c:/host/c
       - ./credentials.json:/app/credentials.json:ro
+      - ./project-folders.json:/app/project-folders.json
     environment:
       - CLAWD_HOST=0.0.0.0
       - CLAWD_PORT=4000
       - HOST_DRIVE_PREFIX=/host/c
-      # --- Push notifications via ntfy (optional) ---
-      - NTFY_TOPIC
-      - NTFY_SERVER
-      # --- Git push support (optional) ---
-      - GIT_USER_NAME
-      - GIT_USER_EMAIL
-      - GITHUB_TOKEN
+      - HOST_CLAUDE_DIR=/host/c/Users/lmdud/.claude
+      - CREDENTIALS_PATH=/app/credentials.json
+      - PROJECT_FOLDERS_PATH=/app/project-folders.json
+    env_file:
+      - .env
     restart: unless-stopped

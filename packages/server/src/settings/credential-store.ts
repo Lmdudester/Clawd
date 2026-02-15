@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, unlinkSync, symlinkSync, existsSync, readdirSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync, symlinkSync, existsSync, readdirSync, mkdirSync, realpathSync } from 'fs';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
 import { config } from '../config.js';
@@ -88,6 +88,16 @@ export class CredentialStore {
 
     // Ensure ~/.claude exists
     mkdirSync(homeClaudeDir, { recursive: true });
+
+    // If already accessible (e.g. via directory symlink), skip
+    if (existsSync(symlinkPath)) {
+      try {
+        if (realpathSync(symlinkPath) === realpathSync(targetFile)) {
+          console.log(`Credentials already accessible at ${symlinkPath}`);
+          return;
+        }
+      } catch {}
+    }
 
     // Ensure onboarding is bypassed
     const dotClaudeJson = join(home, '.claude.json');

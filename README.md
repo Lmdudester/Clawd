@@ -49,8 +49,7 @@ clawd/
 │           ├── stores/      # Zustand state management
 │           └── lib/         # API client utilities
 ├── scripts/             # Docker entrypoint scripts
-├── Dockerfile           # Standard Docker build
-├── Dockerfile.autoupdate # Auto-updating Docker build
+├── Dockerfile           # Docker build (auto-updates on each start)
 └── docker-compose.yml   # Docker Compose configuration
 ```
 
@@ -100,9 +99,9 @@ clawd/
    docker compose up -d --build
    ```
 
-6. **Open** `http://localhost:3000` in your browser and log in with the credentials you configured.
+6. **Open** `http://localhost:4000` in your browser and log in with the credentials you configured.
 
-> **Note:** The standard Docker entrypoint runs `git pull`, `npm install`, and `npm run build` on every container start, so it will automatically pick up new commits if the repository is mounted. To disable this behavior, use the auto-update Dockerfile instead (which clones fresh on each start) or remove the pull/build steps from `scripts/entrypoint.sh`.
+> **Note:** The container clones the latest code, installs dependencies, and builds on every start — so it always runs the newest version. You can customize the branch or repo URL via `GIT_BRANCH` and `GIT_REPO_URL` environment variables.
 
 ### Using OAuth (Claude Max)
 
@@ -155,23 +154,21 @@ Clawd can send push notifications to your phone or desktop when a session needs 
 
 4. **Enable notifications per session** — Open a session's settings in the Clawd UI and toggle notifications on. Notifications are disabled by default for each session.
 
-### Auto-Update Deployment
+### Host Config Sharing
 
-For a deployment that automatically pulls the latest code on every container restart:
+To make your host's global Claude Code config (skills, `CLAUDE.md`, settings, keybindings) available inside Docker sessions:
 
-1. **Copy the example compose file:**
-
-   ```bash
-   cp docker-compose.autoupdate.example.yml docker-compose.autoupdate.yml
-   ```
-
-2. **Edit** `docker-compose.autoupdate.yml` with your volume mounts and environment variables.
-
-3. **Start with the auto-update compose file:**
+1. **Add `HOST_CLAUDE_DIR`** to your `.env` file or `docker-compose.yml`:
 
    ```bash
-   docker compose -f docker-compose.autoupdate.yml up -d --build
+   HOST_CLAUDE_DIR=/host/c/Users/YourUsername/.claude
    ```
+
+   The path should use the container mount prefix (e.g., `/host/c/Users/...` matching the volume mount).
+
+2. **Rebuild and restart** — the entrypoint symlinks `~/.claude` inside the container to the host directory.
+
+> **Limitation:** Project-scoped config in `~/.claude/projects/` won't activate because the path encoding differs between host and container.
 
 ## Development
 
@@ -219,6 +216,7 @@ npm start       # Start the production server
 | `JWT_SECRET` | Auto-generated | JWT signing secret (tokens invalidate on restart if not set) |
 | `CREDENTIALS_PATH` | `./credentials.json` | Path to the login credentials file |
 | `PROJECT_FOLDERS_PATH` | `./project-folders.json` | Path to the project folders config file |
+| `HOST_CLAUDE_DIR` | — | Container path to host `~/.claude` dir (enables global skills, settings, CLAUDE.md) |
 
 ### Git Push (Optional)
 
@@ -236,7 +234,7 @@ npm start       # Start the production server
 | `NTFY_TOPIC` | — | [ntfy.sh](https://ntfy.sh) topic name (e.g., `clawd-your-topic`) — enables push notifications |
 | `NTFY_SERVER` | `https://ntfy.sh` | ntfy server URL (use default unless self-hosting) |
 
-### Auto-Update Only
+### Auto-Update
 
 | Variable | Default | Description |
 |----------|---------|-------------|
