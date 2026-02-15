@@ -1,7 +1,33 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import type { SessionMessage } from '@clawd/shared';
 import { MessageBubble } from './MessageBubble';
+import { ToolGroup } from './ToolGroup';
 import { StreamingText } from './StreamingText';
+
+type Segment =
+  | { kind: 'message'; message: SessionMessage }
+  | { kind: 'tool_group'; messages: SessionMessage[] };
+
+function groupMessages(messages: SessionMessage[]): Segment[] {
+  const segments: Segment[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    const msg = messages[i];
+    if (msg.type === 'tool_call' || msg.type === 'tool_result') {
+      const group: SessionMessage[] = [msg];
+      i++;
+      while (i < messages.length && (messages[i].type === 'tool_call' || messages[i].type === 'tool_result')) {
+        group.push(messages[i]);
+        i++;
+      }
+      segments.push({ kind: 'tool_group', messages: group });
+    } else {
+      segments.push({ kind: 'message', message: msg });
+      i++;
+    }
+  }
+  return segments;
+}
 
 interface Props {
   messages: SessionMessage[];
@@ -13,6 +39,7 @@ export function MessageList({ messages, streamingText }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const segments = useMemo(() => groupMessages(messages), [messages]);
 
   useEffect(() => {
     if (autoScroll) {
@@ -44,9 +71,13 @@ export function MessageList({ messages, streamingText }: Props) {
           <p className="text-lg">Send a message to get started</p>
         </div>
       )}
-      {messages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} />
-      ))}
+      {segments.map((seg) =>
+        seg.kind === 'tool_group' ? (
+          <ToolGroup key={seg.messages[0].id} messages={seg.messages} />
+        ) : (
+          <MessageBubble key={seg.message.id} message={seg.message} />
+        )
+      )}
       {streamingText && <StreamingText text={streamingText} />}
       <div ref={bottomRef} />
 
