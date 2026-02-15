@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { SessionMessage } from '@clawd/shared';
 import { MarkdownRenderer } from '../common/MarkdownRenderer';
 
@@ -77,8 +78,8 @@ export function PlanCard({ toolCall, result, fullContent, defaultCollapsed }: Pr
         </div>
       </div>
 
-      {/* Full-screen overlay */}
-      {overlayOpen && (
+      {/* Full-screen overlay (portaled to body to avoid scroll container issues on mobile) */}
+      {overlayOpen && createPortal(
         <div
           className="fixed inset-0 z-50 bg-black/60"
           onClick={() => setOverlayOpen(false)}
@@ -87,8 +88,8 @@ export function PlanCard({ toolCall, result, fullContent, defaultCollapsed }: Pr
             className="h-full bg-slate-900 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Sticky header */}
-            <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-700">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-700 shrink-0">
               <button
                 onClick={() => setOverlayOpen(false)}
                 className="p-1 -ml-1 text-slate-400 hover:text-white transition-colors border border-slate-600 rounded"
@@ -111,7 +112,8 @@ export function PlanCard({ toolCall, result, fullContent, defaultCollapsed }: Pr
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
