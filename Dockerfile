@@ -38,6 +38,10 @@ WORKDIR /app
 COPY scripts/entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
+# Fix WSL/Docker 9p symlink mismatch: pnpm symlinks resolve to /mnt/host/c/...
+# but the actual mount is at /host/c, so create a bridge symlink
+RUN ln -s /host /mnt/host
+
 # Set up non-root user (Claude Code rejects --dangerously-skip-permissions as root)
 RUN mkdir -p /home/node/.claude \
     && echo '{"hasCompletedOnboarding":true}' > /home/node/.claude.json \
