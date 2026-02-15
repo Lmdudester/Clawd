@@ -20,4 +20,9 @@ services:
       - CREDENTIALS_PATH=/app/credentials.json
       # - GIT_BRANCH=main
       # - GIT_REPO_URL=https://github.com/Lmdudester/Clawd.git
+      # --- Git push support (optional) ---
+      # - GIT_USER_NAME=Your Name
+      # - GIT_USER_EMAIL=you@example.com
+      # - GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+      # - GIT_CREDENTIALS_URL=https://username:token@github.com
     restart: unless-stopped

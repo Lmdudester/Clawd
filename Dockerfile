@@ -24,8 +24,13 @@ COPY . .
 # Build shared types, then client, then server
 RUN npm run build
 
+# Copy entrypoint and fix line endings
+COPY scripts/entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
 # Expose the server port
 EXPOSE 3000
 
 # Start the server (serves built client as static files)
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["npm", "start"]

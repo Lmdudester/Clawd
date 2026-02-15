@@ -112,6 +112,34 @@ If you have a Claude Max subscription with the Claude CLI installed:
 2. Use the **Auth Settings** section to locate your Claude CLI credentials (typically in `~/.claude/.credentials.json` on the host)
 3. The app will use your OAuth tokens for Claude access — no API key needed
 
+### Enabling Git Push
+
+By default, Claude sessions inside Docker cannot `git push` because the container has no git credentials. To enable push access:
+
+1. **Create a GitHub Personal Access Token (PAT):**
+   - Go to [GitHub Settings > Developer settings > Personal access tokens > Fine-grained tokens](https://github.com/settings/tokens?type=beta)
+   - Create a token with **Contents: Read and write** permission on the repos you want Claude to push to
+
+2. **Add environment variables** to your `.env` file or `docker-compose.yml`:
+
+   ```bash
+   GIT_USER_NAME=Your Name
+   GIT_USER_EMAIL=you@example.com
+   GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+   ```
+
+3. **Uncomment the git variables** in `docker-compose.yml` under the `environment` section, or add them to `.env`.
+
+4. **Rebuild and restart:**
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+The entrypoint script configures `git config --global` identity and credential storage at startup. All Claude sessions inherit these settings automatically.
+
+> **Non-GitHub hosts:** Use `GIT_CREDENTIALS_URL` instead of `GITHUB_TOKEN` with the format `https://username:token@your-git-host.com`.
+
 ### Auto-Update Deployment
 
 For a deployment that automatically pulls the latest code on every container restart:
@@ -176,6 +204,15 @@ npm start       # Start the production server
 | `JWT_SECRET` | Auto-generated | JWT signing secret (tokens invalidate on restart if not set) |
 | `CREDENTIALS_PATH` | `./credentials.json` | Path to the login credentials file |
 | `PROJECT_FOLDERS_PATH` | `./project-folders.json` | Path to the project folders config file |
+
+### Git Push (Optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GIT_USER_NAME` | — | Git commit author name |
+| `GIT_USER_EMAIL` | `<name>@users.noreply.github.com` | Git commit author email |
+| `GITHUB_TOKEN` | — | GitHub PAT for HTTPS push (writes `git-credentials` at startup) |
+| `GIT_CREDENTIALS_URL` | — | Full credentials URL for non-GitHub hosts (e.g., `https://user:token@gitlab.com`) |
 
 ### Auto-Update Only
 

@@ -19,5 +19,8 @@ project-folders.json
 # Root copy of logo (canonical copy is in packages/client/public/)
 /clawd.png
 
+# Git credentials (written by entrypoint inside Docker)
+.git-credentials
+
 # User docker-compose overrides (example files are tracked)
 docker-compose.autoupdate.yml
