@@ -13,6 +13,7 @@ export class CredentialStore {
 
   constructor() {
     this.load();
+    this.autoSelectIfSingle();
   }
 
   private load(): void {
@@ -21,6 +22,15 @@ export class CredentialStore {
       this.storedAuth = JSON.parse(raw);
     } catch {
       this.storedAuth = null;
+    }
+  }
+
+  private autoSelectIfSingle(): void {
+    if (this.storedAuth) return;
+    const available = this.discoverCredentialFiles();
+    if (available.length === 1) {
+      console.log(`Auth: Auto-selecting only available credential: ${available[0]}`);
+      this.setCredentialsPath(available[0]);
     }
   }
 
