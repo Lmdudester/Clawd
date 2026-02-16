@@ -68,6 +68,7 @@ export class SDKRunner {
   // current gate, installs its own, then awaits the previous) for strict FIFO.
   private approvalGate: Promise<void> | null = null;
   private interrupted = false;
+  private deferredInterrupt = false;
 
   // Pending approval/question promises
   private pendingApproval: {
@@ -198,12 +199,26 @@ export class SDKRunner {
 
   private interrupt(): void {
     this.interrupted = true;
-    // The SDK's interrupt() aborts the AbortSignal passed to canUseTool,
-    // which resolves our pending Promise.race with a deny. No need to
-    // manually resolve pendingApproval/pendingQuestion.
-    this.queryStream?.interrupt();
-    this.pendingApproval = null;
-    this.pendingQuestion = null;
+
+    if (this.pendingApproval || this.pendingQuestion) {
+      // A canUseTool callback is in-flight. Calling queryStream.interrupt()
+      // now would race with the SDK's control_response for the pending
+      // request, corrupting conversation state (duplicate tool_use ids).
+      // Instead, resolve the pending promise immediately and defer the
+      // interrupt until after the canUseTool callback returns.
+      this.deferredInterrupt = true;
+      if (this.pendingApproval) {
+        this.pendingApproval.resolve({ behavior: 'deny', message: 'Interrupted by user' });
+        this.pendingApproval = null;
+      }
+      if (this.pendingQuestion) {
+        this.pendingQuestion.resolve({});
+        this.pendingQuestion = null;
+      }
+    } else {
+      // No pending callback — interrupt immediately.
+      this.queryStream?.interrupt();
+    }
   }
 
   private async setModel(model: string): Promise<void> {
@@ -323,7 +338,15 @@ export class SDKRunner {
                 return { behavior: 'allow', updatedInput: input };
               }
             }
-            return this.handleToolApproval(toolName, input, options?.signal);
+            const result = await this.handleToolApproval(toolName, input, options?.signal);
+            // If an interrupt was deferred (waiting for this callback to
+            // finish), fire it now. The SDK will send the control_response
+            // for this canUseTool call first, then process the interrupt.
+            if (this.deferredInterrupt) {
+              this.deferredInterrupt = false;
+              this.queryStream?.interrupt();
+            }
+            return result;
           },
           stderr: (data: string) => {
             console.error(`[agent] claude stderr: ${data}`);
