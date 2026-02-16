@@ -88,10 +88,11 @@ export class ContainerManager {
     if (cfg.gitUserEmail) env.push(`GIT_USER_EMAIL=${cfg.gitUserEmail}`);
     if (cfg.oauthToken) env.push(`CLAUDE_CODE_OAUTH_TOKEN=${cfg.oauthToken}`);
 
-    // Build volume binds
+    // Build volume binds — mount only the credentials file, not the whole .claude dir,
+    // so the SDK can still create writable dirs like .claude/debug/
     const binds: string[] = [];
     if (cfg.claudeDir) {
-      binds.push(`${cfg.claudeDir}:/home/node/.claude:ro`);
+      binds.push(`${cfg.claudeDir}/.credentials.json:/home/node/.claude/.credentials.json:ro`);
     }
 
     const container = await this.docker.createContainer({
