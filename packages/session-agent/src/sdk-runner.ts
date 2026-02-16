@@ -63,6 +63,12 @@ export class SDKRunner {
   private config?: ClawdConfig;
   private hasAssistantMessage = false;
 
+  // Cumulative context tracking
+  private cumulativeInputTokens = 0;
+  private cumulativeOutputTokens = 0;
+  private cumulativeCacheReadTokens = 0;
+  private cumulativeCacheCreationTokens = 0;
+
   // Serialization gate for tool approvals — ensures only one approval dialog
   // is in-flight at a time. Uses promise chaining (each caller captures the
   // current gate, installs its own, then awaits the previous) for strict FIFO.
@@ -656,25 +662,81 @@ export class SDKRunner {
         const isError = result.is_error ?? false;
         console.log(`[agent] result: ${isError ? 'ERROR' : 'ok'}, cost: $${totalCostUsd.toFixed(4)}`);
 
-        // Build context usage snapshot
+        // Extract usage from this turn
         const usage = result.usage;
+        const lastTurnInputTokens = usage?.input_tokens ?? 0;
+        const lastTurnOutputTokens = usage?.output_tokens ?? 0;
+        const lastTurnCacheReadTokens = usage?.cache_read_input_tokens ?? 0;
+        const lastTurnCacheCreationTokens = usage?.cache_creation_input_tokens ?? 0;
+
+        // Accumulate tokens
+        this.cumulativeInputTokens += lastTurnInputTokens;
+        this.cumulativeOutputTokens += lastTurnOutputTokens;
+        this.cumulativeCacheReadTokens += lastTurnCacheReadTokens;
+        this.cumulativeCacheCreationTokens += lastTurnCacheCreationTokens;
+
+        // Extract model metadata with better logging
         const modelUsageMap = result.modelUsage as Record<string, any> | undefined;
         let contextWindow = 0;
         let maxOutputTokens = 0;
+
         if (modelUsageMap) {
-          const firstModel = Object.values(modelUsageMap)[0];
-          if (firstModel) {
-            contextWindow = firstModel.contextWindow ?? 0;
-            maxOutputTokens = firstModel.maxOutputTokens ?? 0;
+          const models = Object.entries(modelUsageMap);
+          if (models.length > 0) {
+            if (models.length > 1) {
+              console.warn('[agent] Multiple models in modelUsage:', models.map(([k]) => k));
+            }
+            const [modelName, modelData] = models[0];
+            contextWindow = modelData.contextWindow ?? 0;
+            maxOutputTokens = modelData.maxOutputTokens ?? 0;
+            console.log(`[agent] Model: ${modelName}, contextWindow: ${contextWindow}`);
+          } else {
+            console.warn('[agent] modelUsage is empty object');
           }
+        } else {
+          console.warn('[agent] No modelUsage in result');
         }
 
+        // Calculate estimated context used
+        // Weight cache reads at ~10% since they're in context but cheaper
+        // Weight cache creation at ~50% since it's being created
+        const estimatedContextUsed =
+          this.cumulativeInputTokens +
+          this.cumulativeOutputTokens +
+          (this.cumulativeCacheReadTokens * 0.1) +
+          (this.cumulativeCacheCreationTokens * 0.5);
+
+        // Mark as estimated since we don't have exact conversation context size from SDK
+        const isEstimated = true;
+
+        console.log(
+          `[agent] Context tracking - Input: ${this.cumulativeInputTokens}, ` +
+          `Output: ${this.cumulativeOutputTokens}, ` +
+          `Cache Read: ${this.cumulativeCacheReadTokens}, ` +
+          `Cache Creation: ${this.cumulativeCacheCreationTokens}, ` +
+          `Estimated Context: ${Math.round(estimatedContextUsed)}/${contextWindow} ` +
+          `(${contextWindow > 0 ? ((estimatedContextUsed / contextWindow) * 100).toFixed(1) : 0}%)`
+        );
+
         const contextUsage: ContextUsage = {
-          inputTokens: usage?.input_tokens ?? 0,
-          outputTokens: usage?.output_tokens ?? 0,
-          cacheReadInputTokens: usage?.cache_read_input_tokens ?? 0,
-          cacheCreationInputTokens: usage?.cache_creation_input_tokens ?? 0,
+          // Cumulative totals
+          cumulativeInputTokens: this.cumulativeInputTokens,
+          cumulativeOutputTokens: this.cumulativeOutputTokens,
+          cumulativeCacheReadTokens: this.cumulativeCacheReadTokens,
+          cumulativeCacheCreationTokens: this.cumulativeCacheCreationTokens,
+
+          // Last turn only
+          lastTurnInputTokens,
+          lastTurnOutputTokens,
+          lastTurnCacheReadTokens,
+          lastTurnCacheCreationTokens,
+
+          // Context window tracking
           contextWindow,
+          estimatedContextUsed,
+          isEstimated,
+
+          // Existing fields
           maxOutputTokens,
           totalCostUsd,
           numTurns: result.num_turns ?? 0,

@@ -30,10 +30,14 @@ function barColor(pct: number): string {
 export function ContextUsageBar({ usage }: { usage: ContextUsage }) {
   const [expanded, setExpanded] = useState(false);
 
-  const totalInput = usage.inputTokens + usage.cacheReadInputTokens + usage.cacheCreationInputTokens;
   const contextPct = usage.contextWindow > 0
-    ? (totalInput / usage.contextWindow) * 100
+    ? (usage.estimatedContextUsed / usage.contextWindow) * 100
     : 0;
+
+  // Display with ~ prefix if estimated
+  const displayPct = usage.isEstimated
+    ? `~${Math.min(contextPct, 100).toFixed(0)}%`
+    : `${Math.min(contextPct, 100).toFixed(0)}%`;
 
   return (
     <div className="px-4 py-1.5 bg-slate-900/60 border-b border-slate-800 shrink-0">
@@ -48,7 +52,7 @@ export function ContextUsageBar({ usage }: { usage: ContextUsage }) {
           />
         </div>
         <span className="shrink-0">
-          {Math.min(contextPct, 100).toFixed(0)}% context
+          {displayPct} context
         </span>
         <span className="shrink-0 text-slate-500">|</span>
         <span className="shrink-0">{formatCost(usage.totalCostUsd)}</span>
@@ -65,30 +69,66 @@ export function ContextUsageBar({ usage }: { usage: ContextUsage }) {
       </button>
 
       {expanded && (
-        <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-400 pb-1">
-          <div className="flex justify-between">
-            <span>Input tokens</span>
-            <span className="text-slate-300">{formatTokens(usage.inputTokens)}</span>
+        <div className="mt-2 space-y-2 pb-1">
+          {/* Cumulative Session Totals */}
+          <div>
+            <div className="text-xs font-semibold text-slate-300 mb-1">Cumulative (Session)</div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-400">
+              <div className="flex justify-between">
+                <span>Input tokens</span>
+                <span className="text-slate-300">{formatTokens(usage.cumulativeInputTokens)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Output tokens</span>
+                <span className="text-slate-300">{formatTokens(usage.cumulativeOutputTokens)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Cache read</span>
+                <span className="text-slate-300">{formatTokens(usage.cumulativeCacheReadTokens)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Cache creation</span>
+                <span className="text-slate-300">{formatTokens(usage.cumulativeCacheCreationTokens)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Estimated context</span>
+                <span className="text-slate-300">
+                  {formatTokens(Math.round(usage.estimatedContextUsed))}
+                  {usage.isEstimated && <span className="text-slate-500 ml-1">~</span>}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Context window</span>
+                <span className="text-slate-300">{formatTokens(usage.contextWindow)}</span>
+              </div>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span>Output tokens</span>
-            <span className="text-slate-300">{formatTokens(usage.outputTokens)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Cache read</span>
-            <span className="text-slate-300">{formatTokens(usage.cacheReadInputTokens)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Cache creation</span>
-            <span className="text-slate-300">{formatTokens(usage.cacheCreationInputTokens)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Context window</span>
-            <span className="text-slate-300">{formatTokens(usage.contextWindow)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>API time</span>
-            <span className="text-slate-300">{formatDuration(usage.durationApiMs)}</span>
+
+          {/* Last Turn */}
+          <div>
+            <div className="text-xs font-semibold text-slate-300 mb-1">Last Turn</div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-400">
+              <div className="flex justify-between">
+                <span>Input tokens</span>
+                <span className="text-slate-300">{formatTokens(usage.lastTurnInputTokens)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Output tokens</span>
+                <span className="text-slate-300">{formatTokens(usage.lastTurnOutputTokens)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Cache read</span>
+                <span className="text-slate-300">{formatTokens(usage.lastTurnCacheReadTokens)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Cache creation</span>
+                <span className="text-slate-300">{formatTokens(usage.lastTurnCacheCreationTokens)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>API time</span>
+                <span className="text-slate-300">{formatDuration(usage.durationApiMs)}</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
