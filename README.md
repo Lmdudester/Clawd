@@ -1,21 +1,23 @@
 # Clawd
 
-A web-based remote interface for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Anthropic's CLI coding assistant. Run Claude Code inside a Docker container and interact with it from any browser on your local network — including mobile devices.
+A web-based remote interface for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Anthropic's CLI coding assistant. Run Claude Code sessions in isolated Docker containers and interact with them from any browser on your local network — including mobile devices.
 
 ## Features
 
-- **Multi-session management** — Create, view, and delete independent Claude Code sessions, each with its own working directory and message history
+- **Per-session Docker containers** — Each session runs in its own isolated container with full tooling (Git, Python, GitHub CLI, Playwright, etc.), preventing sessions from interfering with each other
+- **Branch-aware session creation** — Select a repository and branch (or create a new one) when starting a session; the container clones the repo automatically
+- **Project configuration** — Repositories can include a `.clawd.yml` file to define setup commands, environment variables, and MCP servers that run automatically when a session starts
 - **Real-time streaming** — Messages stream token-by-token over WebSocket with a live typing indicator
 - **Tool approval workflow** — Approve or deny each tool call (Bash, Edit, Read, etc.) before Claude executes it
 - **Permission modes** — Per-session permission control:
   - *Normal* — Prompt for each tool use
+  - *Auto Edits* — Auto-approve file edits within the project directory, prompt for everything else
   - *Auto Accept* — Automatically approve all tool calls
   - *Plan* — Deny all tool calls, forcing Claude to describe rather than execute
 - **Model switching** — Switch between available Claude models mid-session
 - **API usage monitoring** — Real-time Anthropic API rate limit display with color-coded progress bars
 - **OAuth authentication** — Use OAuth credentials from an existing Claude CLI installation (Claude Max)
-- **Project folder bookmarks** — Save frequently-used project directories for quick session creation
-- **Windows path translation** — Seamless translation between Windows host paths and Docker container paths
+- **Project repo bookmarks** — Save frequently-used repositories for quick session creation
 - **Push notifications** — Optional [ntfy.sh](https://ntfy.sh) integration sends mobile/desktop alerts when a session needs approval, asks a question, or finishes a task (only fires when no one is actively viewing the session)
 - **PWA support** — Install as a Progressive Web App for an app-like experience on mobile
 - **Auto-update deployment** — Optional Docker configuration that pulls the latest code on every container start
@@ -34,24 +36,58 @@ A web-based remote interface for [Claude Code](https://docs.anthropic.com/en/doc
 ```
 clawd/
 ├── packages/
-│   ├── shared/          # Shared TypeScript types (client + server)
-│   ├── server/          # Express + WebSocket backend
+│   ├── shared/              # Shared TypeScript types (client + server + agent)
+│   ├── server/              # Express + WebSocket backend (master)
 │   │   └── src/
-│   │       ├── auth/        # JWT authentication middleware
-│   │       ├── routes/      # REST API endpoints
-│   │       ├── sessions/    # Claude Code session management
-│   │       ├── settings/    # Credential & folder persistence
-│   │       └── ws/          # WebSocket handler & routing
-│   └── client/          # React SPA frontend
+│   │       ├── auth/            # JWT authentication middleware
+│   │       ├── routes/          # REST API endpoints (sessions, repos, settings)
+│   │       ├── sessions/        # Session & container lifecycle management
+│   │       ├── settings/        # Credential & repo persistence
+│   │       └── ws/              # Client & internal WebSocket handlers
+│   ├── session-agent/       # Agent process running inside each session container
+│   │   └── src/
+│   │       ├── index.ts         # Entrypoint: connects to master, runs setup, starts SDK
+│   │       ├── sdk-runner.ts    # Claude Agent SDK wrapper with tool approval logic
+│   │       └── master-client.ts # WebSocket client for master communication
+│   └── client/              # React SPA frontend
 │       └── src/
-│           ├── components/  # UI components (chat, sessions, settings)
-│           ├── hooks/       # Custom React hooks
-│           ├── stores/      # Zustand state management
-│           └── lib/         # API client utilities
-├── scripts/             # Docker entrypoint scripts
-├── Dockerfile           # Docker build (auto-updates on each start)
-└── docker-compose.yml   # Docker Compose configuration
+│           ├── components/      # UI components (chat, sessions, settings)
+│           ├── hooks/           # Custom React hooks
+│           ├── stores/          # Zustand state management
+│           └── lib/             # API client utilities
+├── session-skills/          # Skills baked into every session container
+├── scripts/                 # Docker entrypoint scripts
+├── Dockerfile               # Master server container
+├── Dockerfile.session       # Session container (full dev environment)
+└── docker-compose.yml       # Docker Compose configuration
 ```
+
+## Architecture
+
+Clawd uses a **master/agent** architecture with per-session Docker containers:
+
+```
+┌──────────┐     ┌──────────────────────┐     ┌─────────────────────┐
+│  Browser  │◄──►│    Master Server     │◄──►│  Session Container  │
+│  (React)  │ WS │  (Express + WS)      │ WS │  (session-agent)    │
+│           │    │                      │    │                     │
+│           │    │  - REST API          │    │  - Claude Agent SDK │
+│           │    │  - Client WebSocket  │    │  - Tool approval    │
+│           │    │  - Container manager │    │  - .clawd.yml setup │
+│           │    │  - Internal WS       │    │  - Git, Python, etc │
+└──────────┘     └──────────────────────┘     └─────────────────────┘
+                          │                          ▲
+                          │  Docker API               │ git clone
+                          ▼                          │
+                 ┌──────────────────┐        ┌──────────────┐
+                 │  Docker Engine   │        │  Git Remote   │
+                 └──────────────────┘        └──────────────┘
+```
+
+1. The **master server** handles authentication, serves the frontend, and manages session container lifecycles via the Docker API
+2. When a session is created, the master starts a **session container** from the `clawd-session` image, which clones the target repo/branch and launches the **session agent**
+3. The session agent connects back to the master via an **internal WebSocket**, runs the Claude Agent SDK, and relays messages, tool approvals, and streaming tokens
+4. The **browser client** communicates with the master via REST API and a client-facing WebSocket
 
 ## Getting Started
 
@@ -89,11 +125,12 @@ clawd/
 
    ```yaml
    volumes:
-     - /c:/host/c                              # Mount your host drive
-     - ./credentials.json:/app/credentials.json:ro  # Mount credentials
+     - /var/run/docker.sock:/var/run/docker.sock  # Required for session containers
+     - /c:/host/c                                  # Mount your host drive
+     - ./credentials.json:/app/credentials.json:ro # Mount credentials
    ```
 
-5. **Build and start:**
+5. **Build and start** (builds both the master and session images):
 
    ```bash
    docker compose up -d --build
@@ -101,7 +138,7 @@ clawd/
 
 6. **Open** `http://localhost:4000` in your browser and log in with the credentials you configured.
 
-> **Note:** The container clones the latest code, installs dependencies, and builds on every start — so it always runs the newest version. You can customize the branch or repo URL via `GIT_BRANCH` and `GIT_REPO_URL` environment variables.
+> **Note:** The master container clones the latest code, installs dependencies, and builds on every start — so it always runs the newest version. The session container image (`clawd-session:latest`) is built separately and contains all development tooling.
 
 ### Using OAuth (Claude Max)
 
@@ -127,15 +164,13 @@ By default, Claude sessions inside Docker cannot `git push` because the containe
    GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
    ```
 
-3. **Uncomment the git variables** in `docker-compose.yml` under the `environment` section, or add them to `.env`.
-
-4. **Rebuild and restart:**
+3. **Rebuild and restart:**
 
    ```bash
    docker compose up -d --build
    ```
 
-The entrypoint script configures `git config --global` identity and credential storage at startup. All Claude sessions inherit these settings automatically.
+The entrypoint script configures `git config --global` identity and credential storage at startup. All session containers inherit these settings automatically.
 
 > **Non-GitHub hosts:** Use `GIT_CREDENTIALS_URL` instead of `GITHUB_TOKEN` with the format `https://username:token@your-git-host.com`.
 
@@ -154,21 +189,39 @@ Clawd can send push notifications to your phone or desktop when a session needs 
 
 4. **Enable notifications per session** — Open a session's settings in the Clawd UI and toggle notifications on. Notifications are disabled by default for each session.
 
-### Host Config Sharing
+### Project Configuration (.clawd.yml)
 
-To make your host's global Claude Code config (skills, `CLAUDE.md`, settings, keybindings) available inside Docker sessions:
+Repositories can include a `.clawd.yml` file at their root to configure session setup automatically. When a session starts, the agent reads this file and applies the configuration before accepting user input.
 
-1. **Add `HOST_CLAUDE_DIR`** to your `.env` file or `docker-compose.yml`:
+```yaml
+# .clawd.yml — optional project configuration for Clawd sessions
 
-   ```bash
-   HOST_CLAUDE_DIR=/host/c/Users/YourUsername/.claude
-   ```
+# Commands to run after cloning (dependency install, build, etc.)
+setup:
+  - npm install
+  - npm run build
 
-   The path should use the container mount prefix (e.g., `/host/c/Users/...` matching the volume mount).
+# Extra environment variables for the Claude SDK process
+env:
+  DATABASE_URL: postgres://localhost:5432/mydb
 
-2. **Rebuild and restart** — the entrypoint symlinks `~/.claude` inside the container to the host directory.
+# Additional MCP servers (Playwright is always included by default)
+mcp:
+  my-server:
+    command: npx
+    args: [my-mcp-server, --flag]
+```
 
-> **Limitation:** Project-scoped config in `~/.claude/projects/` won't activate because the path encoding differs between host and container.
+### Session Container Tooling
+
+Each session container comes pre-installed with:
+
+- **Node.js 22** + npm + pnpm (via corepack)
+- **Python 3** + pip + venv
+- **Git** + **GitHub CLI** (`gh`)
+- **Playwright** (Chromium) via MCP server
+- **ripgrep**, **jq**, **sqlite3**, **tree**
+- **Claude Code CLI** (`@anthropic-ai/claude-code`)
 
 ## Development
 
@@ -202,9 +255,19 @@ Requires [Node.js 22+](https://nodejs.org/) and npm.
 ### Build
 
 ```bash
-npm run build   # Build shared types, client, and server
+npm run build   # Build shared types, client, server, and session-agent
 npm start       # Start the production server
 ```
+
+### Rebuilding the Session Image
+
+After making changes to the `session-agent` package or `Dockerfile.session`:
+
+```bash
+docker build -f Dockerfile.session -t clawd-session:latest .
+```
+
+Running sessions use the image they started with; new sessions will pick up the updated image.
 
 ## Environment Variables
 
@@ -215,8 +278,17 @@ npm start       # Start the production server
 | `HOST_DRIVE_PREFIX` | — | Container path prefix for host drive mount (e.g., `/host/c`) |
 | `JWT_SECRET` | Auto-generated | JWT signing secret (tokens invalidate on restart if not set) |
 | `CREDENTIALS_PATH` | `./credentials.json` | Path to the login credentials file |
-| `PROJECT_FOLDERS_PATH` | `./project-folders.json` | Path to the project folders config file |
-| `HOST_CLAUDE_DIR` | — | Container path to host `~/.claude` dir (enables global skills, settings, CLAUDE.md) |
+| `PROJECT_REPOS_PATH` | `./project-repos.json` | Path to the project repos config file |
+
+### Docker Session Containers
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAWD_SESSION_IMAGE` | `clawd-session:latest` | Docker image to use for session containers |
+| `CLAWD_NETWORK` | `clawd-network` | Docker network for master/session communication |
+| `SESSION_MEMORY_LIMIT` | `4294967296` (4 GB) | Per-session memory limit in bytes |
+| `SESSION_CPU_SHARES` | `512` | Per-session CPU shares (relative weight) |
+| `SESSION_PIDS_LIMIT` | `256` | Per-session process limit |
 
 ### Git Push (Optional)
 
@@ -241,21 +313,14 @@ npm start       # Start the production server
 | `GIT_BRANCH` | `main` | Git branch to clone on startup |
 | `GIT_REPO_URL` | Clawd GitHub repo | Git repository URL to clone |
 
-## Architecture
-
-Clawd uses a dual-protocol communication pattern:
-
-- **REST API** — CRUD operations for sessions, settings, and authentication
-- **WebSocket** — Real-time bidirectional communication for streaming messages, tool approvals, and session control
-
-The backend wraps the `@anthropic-ai/claude-agent-sdk`, managing Claude Code subprocesses for each session. Messages flow through a `MessageChannel` (AsyncIterable bridge) that connects user input from the WebSocket to the SDK's input stream. SDK output is streamed back to subscribed WebSocket clients token-by-token.
-
 ## Security Notes
 
 - Login credentials in `credentials.json` are stored in plain text. Use strong, unique passwords and restrict network access appropriately.
-- The `.env`, `credentials.json`, `claude-auth.json`, and `project-folders.json` files are gitignored and should never be committed.
+- The `.env`, `credentials.json`, `claude-auth.json`, and `project-repos.json` files are gitignored and should never be committed.
+- The master container requires access to the Docker socket (`/var/run/docker.sock`) to manage session containers. This grants significant system access — only run on trusted networks.
 - When deploying on a local network, consider using a reverse proxy with HTTPS (e.g., Caddy, nginx) for encrypted traffic.
 - The `JWT_SECRET` is auto-generated on each server start if not explicitly set, which invalidates existing sessions on restart.
+- Session containers are resource-limited by default (4 GB memory, 256 processes) to prevent runaway sessions from affecting the host.
 
 ## License
 
