@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zip \
     && rm -rf /var/lib/apt/lists/*
 
+# Allow pip install without virtual env (containers are ephemeral)
+RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
+
 # ── GitHub CLI ─────────────────────────────────────────────────
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
       | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
