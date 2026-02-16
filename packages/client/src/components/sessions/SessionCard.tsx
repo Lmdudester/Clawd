@@ -6,9 +6,7 @@ import { api } from '../../lib/api';
 import { MODE_THEME } from '../../lib/mode-theme';
 
 function repoShortName(url: string): string {
-  // Extract "user/repo" from a GitHub URL or just the last path segment
-  const match = url.match(/(?:github\.com|gitlab\.com)[/:]([^/]+\/[^/.]+)/);
-  if (match) return match[1];
+  // Extract just the repo name from a URL
   return url.split('/').filter(Boolean).pop()?.replace(/\.git$/, '') || url;
 }
 
@@ -72,7 +70,7 @@ export function SessionCard({ session }: { session: SessionInfo }) {
           <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded">{repoShortName(session.repoUrl)}</span>
           <span className="text-sm text-slate-400 bg-slate-800/60 border border-slate-700/50 px-2 py-0.5 rounded font-mono">{session.branch}</span>
         </div>
-        <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded">{new Date(session.createdAt).toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+        <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded">{new Date(session.createdAt).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
       </div>
     </button>
   );
