@@ -126,7 +126,7 @@ export class ContainerManager {
     try {
       const container = this.docker.getContainer(containerId);
       try {
-        await container.stop({ t: 10 });
+        await container.stop({ t: 2 });
       } catch {
         // May already be stopped
       }

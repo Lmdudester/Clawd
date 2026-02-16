@@ -18,7 +18,8 @@ export function SessionCard({ session }: { session: SessionInfo }) {
 
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation();
-    api.deleteSession(session.id).then(() => removeSession(session.id)).catch(() => {});
+    removeSession(session.id);
+    api.deleteSession(session.id).catch(() => {});
   };
 
   return (
