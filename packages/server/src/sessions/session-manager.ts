@@ -180,7 +180,7 @@ export class SessionManager {
     switch (message.type) {
       case 'ready':
         console.log(`[session:${sessionId}] Agent ready`);
-        this.updateStatus(session, 'running');
+        this.updateStatus(session, 'idle');
         this.addMessage(session, {
           id: uuid(),
           sessionId,
@@ -201,6 +201,8 @@ export class SessionManager {
         break;
 
       case 'sdk_message':
+        // Skip user messages — master already adds them in sendMessage()
+        if (message.message.type === 'user') break;
         // Fill in the sessionId (agent sends empty)
         const msg = { ...message.message, sessionId };
         this.addMessage(session, msg);
