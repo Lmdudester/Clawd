@@ -272,7 +272,10 @@ export class SessionManager {
 
   private sendToAgent(sessionId: string, message: MasterToAgentMessage): void {
     const session = this.sessions.get(sessionId);
-    if (!session?.agentWs) return;
+    if (!session?.agentWs) {
+      console.warn(`[session:${sessionId}] Cannot send to agent: no WebSocket (message type: ${message.type})`);
+      return;
+    }
     session.agentWs.send(JSON.stringify(message));
   }
 
@@ -314,6 +317,9 @@ export class SessionManager {
     if (status === 'idle' || status === 'terminated' || status === 'error') return;
 
     console.log(`[session:${sessionId}] interrupting (was ${status})`);
+    session.pendingApproval = null;
+    session.pendingQuestion = null;
+
     this.sendToAgent(sessionId, { type: 'interrupt' });
   }
 

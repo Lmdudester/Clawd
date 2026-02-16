@@ -188,25 +188,20 @@ export class SDKRunner {
     this.pendingQuestion.resolve(answers);
   }
 
-  private async interrupt(): Promise<void> {
-    // Resolve any pending approval/question first, then interrupt
-    let hadPending = false;
+  private interrupt(): void {
+    // Set the SDK's internal stop flag synchronously FIRST, so that when
+    // resolving pending promises unblocks the SDK, it immediately sees the
+    // interrupt flag and exits instead of starting a new API call.
+    this.queryStream?.interrupt();
+
     if (this.pendingApproval) {
       this.pendingApproval.resolve({ behavior: 'deny', message: 'Interrupted by user' });
       this.pendingApproval = null;
-      hadPending = true;
     }
     if (this.pendingQuestion) {
       this.pendingQuestion.resolve({});
       this.pendingQuestion = null;
-      hadPending = true;
     }
-
-    if (hadPending) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-
-    this.queryStream?.interrupt();
   }
 
   private async setModel(model: string): Promise<void> {

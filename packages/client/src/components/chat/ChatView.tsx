@@ -29,6 +29,8 @@ export function ChatView() {
   const setCurrentSession = useSessionStore((s) => s.setCurrentSession);
   const setMessages = useSessionStore((s) => s.setMessages);
   const updateSession = useSessionStore((s) => s.updateSession);
+  const setPendingApproval = useSessionStore((s) => s.setPendingApproval);
+  const setPendingQuestion = useSessionStore((s) => s.setPendingQuestion);
 
   // Subscribe to session on mount
   useEffect(() => {
@@ -66,7 +68,9 @@ export function ChatView() {
   const handleInterrupt = useCallback(() => {
     if (!id) return;
     send({ type: 'interrupt', sessionId: id });
-  }, [id, send]);
+    setPendingApproval(null);
+    setPendingQuestion(null);
+  }, [id, send, setPendingApproval, setPendingQuestion]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
 
