@@ -20,6 +20,27 @@ const READONLY_TOOLS = new Set([
 ]);
 const READONLY_MCP_PREFIXES = ['mcp__playwright__'];
 
+// gh CLI subcommands that are read-only (no mutations)
+const READONLY_GH_PATTERNS = [
+  /^gh\s+repo\s+view\b/,
+  /^gh\s+pr\s+(list|view|status|checks|diff)\b/,
+  /^gh\s+issue\s+(list|view|status)\b/,
+  /^gh\s+release\s+(list|view)\b/,
+  /^gh\s+run\s+(list|view)\b/,
+  /^gh\s+workflow\s+(list|view)\b/,
+  /^gh\s+api\s/,          // gh api (GET by default)
+  /^gh\s+search\s/,       // gh search repos/issues/prs/commits
+  /^gh\s+status\b/,
+];
+
+function isReadOnlyBash(toolName: string, input: Record<string, unknown>): boolean {
+  if (toolName !== 'Bash') return false;
+  const cmd = (typeof input.command === 'string' ? input.command : '').trim();
+  // Reject gh api with --method that isn't GET
+  if (/^gh\s+api\s/.test(cmd) && /--method\s+(?!GET\b)/i.test(cmd)) return false;
+  return READONLY_GH_PATTERNS.some(p => p.test(cmd));
+}
+
 interface SDKRunnerOptions {
   cwd: string;
   permissionMode: PermissionMode;
@@ -384,7 +405,8 @@ export class SDKRunner {
     // Plan mode guard: allow read-only tools, deny mutations
     if (this.permissionMode === 'plan') {
       if (READONLY_TOOLS.has(toolName) ||
-          READONLY_MCP_PREFIXES.some(p => toolName.startsWith(p))) {
+          READONLY_MCP_PREFIXES.some(p => toolName.startsWith(p)) ||
+          isReadOnlyBash(toolName, input)) {
         return { behavior: 'allow', updatedInput: input };
       }
       console.log(`[agent] plan mode blocked tool: ${toolName}`);
@@ -393,7 +415,8 @@ export class SDKRunner {
 
     // Auto-approve read-only tools (normal + auto_edits modes reach here)
     if (READONLY_TOOLS.has(toolName) ||
-        READONLY_MCP_PREFIXES.some(p => toolName.startsWith(p))) {
+        READONLY_MCP_PREFIXES.some(p => toolName.startsWith(p)) ||
+        isReadOnlyBash(toolName, input)) {
       return { behavior: 'allow', updatedInput: input };
     }
 
