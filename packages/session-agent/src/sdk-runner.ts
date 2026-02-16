@@ -63,6 +63,12 @@ export class SDKRunner {
   private config?: ClawdConfig;
   private hasAssistantMessage = false;
 
+  // Serialization gate for tool approvals — ensures only one approval dialog
+  // is in-flight at a time. Uses promise chaining (each caller captures the
+  // current gate, installs its own, then awaits the previous) for strict FIFO.
+  private approvalGate: Promise<void> | null = null;
+  private interrupted = false;
+
   // Pending approval/question promises
   private pendingApproval: {
     approval: PendingApproval;
@@ -154,6 +160,8 @@ export class SDKRunner {
   private sdkSessionId: string | null = null;
 
   private sendUserMessage(content: string): void {
+    this.interrupted = false;
+
     this.masterClient.send({
       type: 'sdk_message',
       message: {
@@ -189,6 +197,8 @@ export class SDKRunner {
   }
 
   private interrupt(): void {
+    this.interrupted = true;
+
     // Set the SDK's internal stop flag synchronously FIRST, so that when
     // resolving pending promises unblocks the SDK, it immediately sees the
     // interrupt flag and exits instead of starting a new API call.
@@ -358,53 +368,15 @@ export class SDKRunner {
     toolName: string,
     input: Record<string, unknown>,
   ): Promise<{ behavior: 'allow'; updatedInput: Record<string, unknown> } | { behavior: 'deny'; message: string }> {
+    // --- Pre-gate fast paths (no serialization needed) ---
+
     // Handle AskUserQuestion specially
     if (toolName === 'AskUserQuestion') {
       return this.handleAskUserQuestion(input);
     }
 
-    // ExitPlanMode — show approval dialog, switch to normal only if approved
-    if (toolName === 'ExitPlanMode' && this.permissionMode === 'plan') {
-      const approvalId = uuid();
-      const approval: PendingApproval = {
-        id: approvalId,
-        toolName,
-        toolInput: input,
-        timestamp: new Date().toISOString(),
-      };
-
-      this.masterClient.send({ type: 'status_update', status: 'awaiting_approval' });
-      this.masterClient.send({ type: 'approval_request', approval });
-
-      const result = await Promise.race([
-        new Promise<{ behavior: 'allow' | 'deny'; message?: string }>((resolve) => {
-          this.pendingApproval = { approval, resolve };
-        }),
-        new Promise<{ behavior: 'deny'; message: string }>((resolve) =>
-          setTimeout(() => resolve({ behavior: 'deny', message: 'Approval timed out (5 min)' }), 5 * 60 * 1000)
-        ),
-      ]);
-
-      this.pendingApproval = null;
-      this.masterClient.send({ type: 'status_update', status: 'running' });
-
-      if (result.behavior === 'allow') {
-        this.permissionMode = 'normal';
-        this.queryStream?.setPermissionMode('default');
-        this.masterClient.send({
-          type: 'session_info_update',
-          permissionMode: 'normal',
-        });
-        console.log('[agent] exited plan mode -> normal');
-        return { behavior: 'allow', updatedInput: input };
-      }
-
-      console.log('[agent] plan exit denied — staying in plan mode');
-      return { behavior: 'deny', message: result.message || 'Plan not approved' };
-    }
-
-    // Plan mode guard: allow read-only tools, deny mutations
-    if (this.permissionMode === 'plan') {
+    // Plan mode guard: allow read-only tools, deny mutations (no gate)
+    if (this.permissionMode === 'plan' && toolName !== 'ExitPlanMode') {
       if (READONLY_TOOLS.has(toolName) ||
           READONLY_MCP_PREFIXES.some(p => toolName.startsWith(p)) ||
           isReadOnlyBash(toolName, input)) {
@@ -414,14 +386,67 @@ export class SDKRunner {
       return { behavior: 'deny', message: 'Tool execution is not allowed in plan mode' };
     }
 
-    // Auto-approve read-only tools (normal + auto_edits modes reach here)
+    // Auto-approve read-only tools (normal + auto_edits modes, no gate)
     if (READONLY_TOOLS.has(toolName) ||
         READONLY_MCP_PREFIXES.some(p => toolName.startsWith(p)) ||
         isReadOnlyBash(toolName, input)) {
       return { behavior: 'allow', updatedInput: input };
     }
 
-    // Show approval dialog
+    // --- Acquire serialization gate ---
+    // Promise chaining: capture current gate, install our own, await previous.
+    // This gives strict FIFO ordering with no thundering herd.
+    let releaseGate!: () => void;
+    const previousGate = this.approvalGate;
+    this.approvalGate = new Promise<void>((resolve) => { releaseGate = resolve; });
+
+    try {
+      if (previousGate) await previousGate;
+
+      // If interrupted while waiting in the queue, deny immediately
+      if (this.interrupted) {
+        console.log(`[agent] queued approval denied (interrupted): ${toolName}`);
+        return { behavior: 'deny', message: 'Interrupted by user' };
+      }
+
+      // ExitPlanMode — show approval dialog, switch to normal only if approved
+      if (toolName === 'ExitPlanMode' && this.permissionMode === 'plan') {
+        const result = await this.sendApprovalAndAwait(toolName, input);
+
+        if (result.behavior === 'allow') {
+          this.permissionMode = 'normal';
+          this.queryStream?.setPermissionMode('default');
+          this.masterClient.send({
+            type: 'session_info_update',
+            permissionMode: 'normal',
+          });
+          console.log('[agent] exited plan mode -> normal');
+          return { behavior: 'allow', updatedInput: input };
+        }
+
+        console.log('[agent] plan exit denied — staying in plan mode');
+        return { behavior: 'deny', message: result.message || 'Plan not approved' };
+      }
+
+      // Normal approval dialog
+      const result = await this.sendApprovalAndAwait(toolName, input);
+
+      if (result.behavior === 'allow') {
+        console.log(`[agent] tool approved: ${toolName}`);
+        return { behavior: 'allow', updatedInput: input };
+      }
+      console.log(`[agent] tool denied: ${toolName} — ${result.message || 'User denied'}`);
+      return { behavior: 'deny', message: result.message || 'User denied' };
+    } finally {
+      releaseGate();
+    }
+  }
+
+  /** Send an approval request to the master and await the user's response. */
+  private async sendApprovalAndAwait(
+    toolName: string,
+    input: Record<string, unknown>,
+  ): Promise<{ behavior: 'allow' | 'deny'; message?: string }> {
     const approvalId = uuid();
     const approval: PendingApproval = {
       id: approvalId,
@@ -448,12 +473,7 @@ export class SDKRunner {
     this.pendingApproval = null;
     this.masterClient.send({ type: 'status_update', status: 'running' });
 
-    if (result.behavior === 'allow') {
-      console.log(`[agent] tool approved: ${toolName}`);
-      return { behavior: 'allow', updatedInput: input };
-    }
-    console.log(`[agent] tool denied: ${toolName} — ${result.message || 'User denied'}`);
-    return { behavior: 'deny', message: result.message || 'User denied' };
+    return result;
   }
 
   private async handleAskUserQuestion(
