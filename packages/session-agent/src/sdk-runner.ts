@@ -675,9 +675,8 @@ export class SDKRunner {
         this.cumulativeCacheReadTokens += lastTurnCacheReadTokens;
         this.cumulativeCacheCreationTokens += lastTurnCacheCreationTokens;
 
-        // Extract model metadata with better logging
+        // Extract maxOutputTokens from model metadata
         const modelUsageMap = result.modelUsage as Record<string, any> | undefined;
-        let contextWindow = 0;
         let maxOutputTokens = 0;
 
         if (modelUsageMap) {
@@ -687,9 +686,8 @@ export class SDKRunner {
               console.warn('[agent] Multiple models in modelUsage:', models.map(([k]) => k));
             }
             const [modelName, modelData] = models[0];
-            contextWindow = modelData.contextWindow ?? 0;
             maxOutputTokens = modelData.maxOutputTokens ?? 0;
-            console.log(`[agent] Model: ${modelName}, contextWindow: ${contextWindow}`);
+            console.log(`[agent] Model: ${modelName}`);
           } else {
             console.warn('[agent] modelUsage is empty object');
           }
@@ -697,25 +695,11 @@ export class SDKRunner {
           console.warn('[agent] No modelUsage in result');
         }
 
-        // Calculate estimated context used
-        // Weight cache reads at ~10% since they're in context but cheaper
-        // Weight cache creation at ~50% since it's being created
-        const estimatedContextUsed =
-          this.cumulativeInputTokens +
-          this.cumulativeOutputTokens +
-          (this.cumulativeCacheReadTokens * 0.1) +
-          (this.cumulativeCacheCreationTokens * 0.5);
-
-        // Mark as estimated since we don't have exact conversation context size from SDK
-        const isEstimated = true;
-
         console.log(
-          `[agent] Context tracking - Input: ${this.cumulativeInputTokens}, ` +
+          `[agent] Token usage - Input: ${this.cumulativeInputTokens}, ` +
           `Output: ${this.cumulativeOutputTokens}, ` +
           `Cache Read: ${this.cumulativeCacheReadTokens}, ` +
-          `Cache Creation: ${this.cumulativeCacheCreationTokens}, ` +
-          `Estimated Context: ${Math.round(estimatedContextUsed)}/${contextWindow} ` +
-          `(${contextWindow > 0 ? ((estimatedContextUsed / contextWindow) * 100).toFixed(1) : 0}%)`
+          `Cache Creation: ${this.cumulativeCacheCreationTokens}`
         );
 
         const contextUsage: ContextUsage = {
@@ -731,12 +715,7 @@ export class SDKRunner {
           lastTurnCacheReadTokens,
           lastTurnCacheCreationTokens,
 
-          // Context window tracking
-          contextWindow,
-          estimatedContextUsed,
-          isEstimated,
-
-          // Existing fields
+          // Session metadata
           maxOutputTokens,
           totalCostUsd,
           numTurns: result.num_turns ?? 0,
