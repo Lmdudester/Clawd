@@ -56,30 +56,45 @@ export function createUsageRoutes(credentialStore: CredentialStore): Router {
       return;
     }
 
-    // Build headers for the Anthropic API call
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-    };
-
-    const token = credentialStore.getAccessToken();
+    // Ensure we have a fresh token (auto-refreshes if expired)
+    let token = await credentialStore.ensureFreshToken();
     if (!token) {
-      res.status(500).json({ error: 'Could not read OAuth access token' });
+      res.status(401).json({ error: 'OAuth token expired and refresh failed. Please re-authenticate via Claude CLI.' });
       return;
     }
-    headers['Authorization'] = `Bearer ${token}`;
-    headers['anthropic-beta'] = 'oauth-2025-04-20';
 
-    try {
-      const apiRes = await fetch(ANTHROPIC_API, {
+    const makeApiRequest = async (bearerToken: string) => {
+      return fetch(ANTHROPIC_API, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+          'Authorization': `Bearer ${bearerToken}`,
+          'anthropic-beta': 'oauth-2025-04-20',
+        },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 1,
           messages: [{ role: 'user', content: 'hi' }],
         }),
       });
+    };
+
+    try {
+      let apiRes = await makeApiRequest(token);
+
+      // Reactive refresh: if we get a 401, try refreshing once and retry
+      if (apiRes.status === 401) {
+        console.warn('[usage] Got 401 from Anthropic API, attempting token refresh...');
+        const newToken = await credentialStore.refreshToken();
+        if (newToken) {
+          apiRes = await makeApiRequest(newToken);
+        }
+        if (apiRes.status === 401) {
+          res.status(401).json({ error: 'OAuth token expired and refresh failed. Please re-authenticate via Claude CLI.' });
+          return;
+        }
+      }
 
       const h = apiRes.headers;
 

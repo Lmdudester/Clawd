@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, createContext, useContext } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import type { ClientMessage, ServerMessage } from '@clawd/shared';
 
 const WS_RECONNECT_BASE = 1000;
@@ -31,6 +32,7 @@ export function useWebSocketProvider(): { send: SendFn } {
   const setPendingApproval = useSessionStore((s) => s.setPendingApproval);
   const setPendingQuestion = useSessionStore((s) => s.setPendingQuestion);
   const setAvailableModels = useSessionStore((s) => s.setAvailableModels);
+  const addNotification = useNotificationStore((s) => s.addNotification);
 
   const connect = useCallback(() => {
     if (!token) return;
@@ -90,6 +92,12 @@ export function useWebSocketProvider(): { send: SendFn } {
         case 'models_list':
           setAvailableModels(message.models);
           break;
+        case 'auth_alert':
+          addNotification(
+            message.status === 'refreshed' ? 'success' : 'error',
+            message.message,
+          );
+          break;
         case 'error':
           console.error(`Session ${message.sessionId} error:`, message.message);
           break;
@@ -109,7 +117,7 @@ export function useWebSocketProvider(): { send: SendFn } {
     ws.onerror = () => {
       ws.close();
     };
-  }, [token, logout, updateSession, addMessages, appendStreamToken, clearStreamTokens, clearSessionStreamTokens, setPendingApproval, setPendingQuestion, setAvailableModels]);
+  }, [token, logout, updateSession, addMessages, appendStreamToken, clearStreamTokens, clearSessionStreamTokens, setPendingApproval, setPendingQuestion, setAvailableModels, addNotification]);
 
   useEffect(() => {
     connect();

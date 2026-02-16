@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import type { AuthStatusResponse } from '@clawd/shared';
+import type { AuthStatusResponse, TokenStatus } from '@clawd/shared';
 
 export function AuthSettings() {
   const [status, setStatus] = useState<AuthStatusResponse | null>(null);
@@ -93,6 +93,22 @@ export function AuthSettings() {
           </div>
         )}
 
+        {status?.tokenStatus && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-400">Status:</span>
+            <TokenStatusBadge status={status.tokenStatus} />
+          </div>
+        )}
+
+        {status?.tokenExpiresAt && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-400">Expires:</span>
+            <span className="text-sm text-slate-300">
+              {formatExpiryTime(status.tokenExpiresAt)}
+            </span>
+          </div>
+        )}
+
       </div>
 
       {/* Error display */}
@@ -149,7 +165,7 @@ export function AuthSettings() {
           OAuth credentials connect to your Claude Max subscription via the Claude CLI.
         </p>
         <p>
-          The server reads your local Claude CLI credentials file directly, so token refresh is automatic.
+          Tokens are automatically refreshed before they expire. If auto-refresh fails, re-authenticate via Claude CLI.
         </p>
       </div>
     </div>
@@ -163,4 +179,37 @@ function StatusLabel({ method }: { method: AuthStatusResponse['method'] }) {
     case 'none':
       return <span className="text-sm font-medium text-red-400">Not Configured</span>;
   }
+}
+
+function TokenStatusBadge({ status }: { status: TokenStatus }) {
+  switch (status) {
+    case 'valid':
+      return <span className="text-sm font-medium text-green-400">Valid</span>;
+    case 'expiring_soon':
+      return <span className="text-sm font-medium text-yellow-400">Expiring Soon</span>;
+    case 'expired':
+      return <span className="text-sm font-medium text-red-400">Expired</span>;
+    case 'unknown':
+      return <span className="text-sm font-medium text-slate-400">Unknown</span>;
+  }
+}
+
+function formatExpiryTime(isoString: string): string {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+
+  if (diffMs <= 0) return 'Expired';
+
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (hours > 24) {
+    const days = Math.floor(hours / 24);
+    return `in ${days}d ${hours % 24}h`;
+  }
+  if (hours > 0) {
+    return `in ${hours}h ${minutes}m`;
+  }
+  return `in ${minutes}m`;
 }

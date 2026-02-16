@@ -37,4 +37,5 @@ export type ServerMessage =
   | { type: 'question'; sessionId: string; question: import('./session.js').PendingQuestion }
   | { type: 'result'; sessionId: string; result: string; costUsd: number; isError: boolean; contextUsage: import('./session.js').ContextUsage | null }
   | { type: 'models_list'; sessionId: string; models: ModelInfo[] }
-  | { type: 'error'; sessionId: string; message: string };
+  | { type: 'error'; sessionId: string; message: string }
+  | { type: 'auth_alert'; status: 'refreshed' | 'refresh_failed'; message: string };

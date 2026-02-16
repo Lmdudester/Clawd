@@ -6,6 +6,7 @@ import { LoginPage } from './components/auth/LoginPage';
 import { SessionList } from './components/sessions/SessionList';
 import { ChatView } from './components/chat/ChatView';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { ToastContainer } from './components/ui/ToastContainer';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -47,6 +48,7 @@ function AuthenticatedApp() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <ToastContainer />
     </WebSocketContext.Provider>
   );
 }

@@ -27,4 +27,5 @@ export type MasterToAgentMessage =
   | { type: 'interrupt' }
   | { type: 'update_settings'; permissionMode?: string; name?: string; notificationsEnabled?: boolean }
   | { type: 'set_model'; model: string }
-  | { type: 'get_models' };
+  | { type: 'get_models' }
+  | { type: 'token_update'; token: string };

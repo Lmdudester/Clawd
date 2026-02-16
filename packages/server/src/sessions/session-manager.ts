@@ -35,6 +35,11 @@ export class SessionManager {
   constructor(credentialStore: CredentialStore, containerManager: ContainerManager) {
     this.credentialStore = credentialStore;
     this.containerManager = containerManager;
+
+    // Push refreshed tokens to all active session agents
+    this.credentialStore.onTokenRefreshed((newToken: string) => {
+      this.broadcastTokenUpdate(newToken);
+    });
   }
 
   onEvent(handler: SessionEventHandler): void {
@@ -116,9 +121,19 @@ export class SessionManager {
     return info;
   }
 
+  // Push a refreshed token to all active session agents.
+  private broadcastTokenUpdate(newToken: string): void {
+    for (const [sessionId, session] of this.sessions) {
+      if (session.agentWs && session.info.status !== 'terminated' && session.info.status !== 'error') {
+        console.log(`[session:${sessionId}] Pushing refreshed token to agent`);
+        this.sendToAgent(sessionId, { type: 'token_update', token: newToken });
+      }
+    }
+  }
+
   private async startContainer(session: ManagedSession): Promise<void> {
     const claudeDir = this.credentialStore.getSelectedClaudeDir();
-    const oauthToken = this.credentialStore.getAccessToken() ?? undefined;
+    const oauthToken = (await this.credentialStore.ensureFreshToken()) ?? undefined;
 
     const containerConfig: SessionContainerConfig = {
       sessionId: session.info.id,

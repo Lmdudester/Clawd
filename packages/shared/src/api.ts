@@ -30,10 +30,14 @@ export interface ErrorResponse {
 
 // Settings API types
 
+export type TokenStatus = 'valid' | 'expiring_soon' | 'expired' | 'unknown';
+
 export interface AuthStatusResponse {
   method: 'oauth_credentials_file' | 'none';
   credentialsPath: string | null;
   maskedToken: string | null;
+  tokenExpiresAt: string | null;
+  tokenStatus: TokenStatus | null;
 }
 
 export interface SetCredentialsPathRequest {

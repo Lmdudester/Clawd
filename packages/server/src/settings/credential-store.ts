@@ -2,14 +2,36 @@ import { readFileSync, writeFileSync, unlinkSync, symlinkSync, existsSync, readd
 import { join, resolve } from 'path';
 import { homedir } from 'os';
 import { config } from '../config.js';
-import type { AuthStatusResponse } from '@clawd/shared';
+import type { AuthStatusResponse, TokenStatus } from '@clawd/shared';
 
 interface StoredAuth {
   claudeDir: string;
 }
 
+interface ClaudeCredentials {
+  claudeAiOauth?: {
+    accessToken?: string;
+    refreshToken?: string;
+    expiresAt?: number; // Unix ms timestamp
+    scopes?: string[];
+  };
+  accessToken?: string;
+}
+
+// Refresh 5 minutes before expiry
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+// Minimum interval between refresh attempts
+const REFRESH_COOLDOWN_MS = 30 * 1000;
+// Proactive check interval
+const PROACTIVE_CHECK_INTERVAL_MS = 60 * 1000;
+
 export class CredentialStore {
   private storedAuth: StoredAuth | null = null;
+  private lastRefreshAttempt = 0;
+  private refreshInProgress: Promise<boolean> | null = null;
+  private refreshedListeners: Array<(newToken: string) => void> = [];
+  private refreshFailedListeners: Array<(error: string) => void> = [];
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.load();
@@ -123,33 +145,17 @@ export class CredentialStore {
     console.log(`Symlinked ${symlinkPath} -> ${targetFile}`);
   }
 
-  // Get current auth status for display.
-  getStatus(): AuthStatusResponse {
-    if (this.storedAuth) {
+  // --- Credentials reading ---
+
+  private readCredentials(): ClaudeCredentials | null {
+    if (!this.storedAuth) return null;
+    try {
       const credFile = join(this.storedAuth.claudeDir, '.credentials.json');
-      let maskedToken: string | null = null;
-
-      try {
-        const raw = readFileSync(credFile, 'utf-8');
-        const creds = JSON.parse(raw);
-        const token = creds.claudeAiOauth?.accessToken || creds.accessToken || '';
-        if (token) {
-          maskedToken = token.slice(0, 8) + '...' + token.slice(-4);
-        }
-      } catch {}
-
-      return {
-        method: 'oauth_credentials_file',
-        credentialsPath: this.storedAuth.claudeDir,
-        maskedToken,
-      };
+      const raw = readFileSync(credFile, 'utf-8');
+      return JSON.parse(raw);
+    } catch {
+      return null;
     }
-
-    return {
-      method: 'none',
-      credentialsPath: null,
-      maskedToken: null,
-    };
   }
 
   // Get the raw OAuth access token from the credentials file.
@@ -164,6 +170,206 @@ export class CredentialStore {
     } catch {
       return null;
     }
+  }
+
+  // --- Token expiry checks ---
+
+  isTokenExpired(): boolean {
+    const creds = this.readCredentials();
+    const expiresAt = creds?.claudeAiOauth?.expiresAt;
+    if (!expiresAt) return false; // Unknown expiry — assume valid
+    return Date.now() >= expiresAt - REFRESH_BUFFER_MS;
+  }
+
+  getTokenStatus(): TokenStatus {
+    const creds = this.readCredentials();
+    const expiresAt = creds?.claudeAiOauth?.expiresAt;
+    if (!expiresAt) return 'unknown';
+    const now = Date.now();
+    if (now >= expiresAt) return 'expired';
+    if (now >= expiresAt - REFRESH_BUFFER_MS) return 'expiring_soon';
+    return 'valid';
+  }
+
+  // --- Token refresh ---
+
+  onTokenRefreshed(listener: (newToken: string) => void): void {
+    this.refreshedListeners.push(listener);
+  }
+
+  onTokenRefreshFailed(listener: (error: string) => void): void {
+    this.refreshFailedListeners.push(listener);
+  }
+
+  // Ensure the token is fresh before use. Auto-refreshes if expired.
+  async ensureFreshToken(): Promise<string | null> {
+    if (!this.isTokenExpired()) {
+      return this.getAccessToken();
+    }
+    return this.refreshToken();
+  }
+
+  // Attempt to refresh the OAuth token. Returns the new access token or null on failure.
+  async refreshToken(): Promise<string | null> {
+    // Serialize: if a refresh is already in-flight, piggyback on it
+    if (this.refreshInProgress) {
+      const success = await this.refreshInProgress;
+      return success ? this.getAccessToken() : null;
+    }
+
+    // Cooldown guard
+    if (Date.now() - this.lastRefreshAttempt < REFRESH_COOLDOWN_MS) {
+      console.warn('[credentials] Refresh attempted too recently, skipping');
+      return null;
+    }
+
+    this.lastRefreshAttempt = Date.now();
+
+    this.refreshInProgress = this.doRefresh();
+    try {
+      const success = await this.refreshInProgress;
+      return success ? this.getAccessToken() : null;
+    } finally {
+      this.refreshInProgress = null;
+    }
+  }
+
+  private async doRefresh(): Promise<boolean> {
+    const creds = this.readCredentials();
+    const refreshToken = creds?.claudeAiOauth?.refreshToken;
+
+    if (!refreshToken) {
+      const msg = 'No refresh token available in .credentials.json';
+      console.error(`[credentials] ${msg}`);
+      for (const listener of this.refreshFailedListeners) listener(msg);
+      return false;
+    }
+
+    console.log('[credentials] Attempting token refresh...');
+
+    try {
+      const response = await fetch('https://console.anthropic.com/v1/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        const msg = `Token refresh failed (${response.status}): ${errorBody}`;
+        console.error(`[credentials] ${msg}`);
+        for (const listener of this.refreshFailedListeners) listener(msg);
+        return false;
+      }
+
+      const data = await response.json() as {
+        access_token: string;
+        refresh_token?: string;
+        expires_in?: number;
+      };
+
+      this.writeRefreshedCredentials(creds!, data);
+
+      const newToken = data.access_token;
+      console.log('[credentials] Token refreshed successfully');
+
+      for (const listener of this.refreshedListeners) {
+        try { listener(newToken); } catch (err) {
+          console.error('[credentials] Refresh listener error:', err);
+        }
+      }
+
+      return true;
+    } catch (err: any) {
+      const msg = `Token refresh error: ${err.message}`;
+      console.error(`[credentials] ${msg}`);
+      for (const listener of this.refreshFailedListeners) listener(msg);
+      return false;
+    }
+  }
+
+  private writeRefreshedCredentials(
+    existing: ClaudeCredentials,
+    oauthResponse: { access_token: string; refresh_token?: string; expires_in?: number },
+  ): void {
+    if (!this.storedAuth) return;
+
+    const credFile = join(this.storedAuth.claudeDir, '.credentials.json');
+
+    if (!existing.claudeAiOauth) existing.claudeAiOauth = {};
+    existing.claudeAiOauth.accessToken = oauthResponse.access_token;
+
+    // Update refresh token if a new one was issued (rotation)
+    if (oauthResponse.refresh_token) {
+      existing.claudeAiOauth.refreshToken = oauthResponse.refresh_token;
+    }
+
+    // Calculate and store expiry time (expiresAt is Unix ms)
+    if (oauthResponse.expires_in) {
+      existing.claudeAiOauth.expiresAt = Date.now() + oauthResponse.expires_in * 1000;
+    }
+
+    writeFileSync(credFile, JSON.stringify(existing, null, 2));
+    console.log(`[credentials] Updated credentials file: ${credFile}`);
+  }
+
+  // --- Proactive refresh timer ---
+
+  startProactiveRefresh(): void {
+    this.refreshTimer = setInterval(() => {
+      if (this.storedAuth && this.isTokenExpired()) {
+        console.log('[credentials] Proactive refresh: token is expired or expiring soon');
+        this.refreshToken().catch((err) => {
+          console.error('[credentials] Proactive refresh failed:', err);
+        });
+      }
+    }, PROACTIVE_CHECK_INTERVAL_MS);
+  }
+
+  stopProactiveRefresh(): void {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  // --- Status & display ---
+
+  getStatus(): AuthStatusResponse {
+    if (this.storedAuth) {
+      const creds = this.readCredentials();
+      let maskedToken: string | null = null;
+      let tokenExpiresAt: string | null = null;
+
+      const token = creds?.claudeAiOauth?.accessToken || creds?.accessToken || '';
+      if (token) {
+        maskedToken = token.slice(0, 8) + '...' + token.slice(-4);
+      }
+
+      const expiresAt = creds?.claudeAiOauth?.expiresAt;
+      if (expiresAt) {
+        tokenExpiresAt = new Date(expiresAt).toISOString();
+      }
+
+      return {
+        method: 'oauth_credentials_file',
+        credentialsPath: this.storedAuth.claudeDir,
+        maskedToken,
+        tokenExpiresAt,
+        tokenStatus: this.getTokenStatus(),
+      };
+    }
+
+    return {
+      method: 'none',
+      credentialsPath: null,
+      maskedToken: null,
+      tokenExpiresAt: null,
+      tokenStatus: null,
+    };
   }
 
   // Get the currently selected .claude directory path (for container volume mounts).

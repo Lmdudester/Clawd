@@ -120,6 +120,10 @@ export class SDKRunner {
       case 'get_models':
         this.getModels();
         break;
+      case 'token_update':
+        process.env.CLAUDE_CODE_OAUTH_TOKEN = message.token;
+        console.log('[agent] OAuth token updated from master');
+        break;
     }
   }
 

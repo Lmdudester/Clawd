@@ -3,9 +3,10 @@ import type { Server } from 'http';
 import { ConnectionManager } from './connection-manager.js';
 import { MessageRouter } from './message-router.js';
 import type { SessionManager } from '../sessions/session-manager.js';
+import type { CredentialStore } from '../settings/credential-store.js';
 import type { Notifier } from '../notifications/notifier.js';
 
-export function setupWebSocket(server: Server, sessionManager: SessionManager, notifier?: Notifier): { connectionManager: ConnectionManager; wss: WebSocketServer } {
+export function setupWebSocket(server: Server, sessionManager: SessionManager, credentialStore: CredentialStore, notifier?: Notifier): { connectionManager: ConnectionManager; wss: WebSocketServer } {
   const wss = new WebSocketServer({ noServer: true });
   const connectionManager = new ConnectionManager();
   const messageRouter = new MessageRouter(sessionManager, connectionManager);
@@ -74,6 +75,23 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, n
         break;
       }
     }
+  });
+
+  // Wire token refresh events to client notifications
+  credentialStore.onTokenRefreshed(() => {
+    connectionManager.broadcastAll({
+      type: 'auth_alert',
+      status: 'refreshed',
+      message: 'OAuth token was automatically refreshed.',
+    });
+  });
+
+  credentialStore.onTokenRefreshFailed((error: string) => {
+    connectionManager.broadcastAll({
+      type: 'auth_alert',
+      status: 'refresh_failed',
+      message: `OAuth token refresh failed. Please re-authenticate via Claude CLI. (${error})`,
+    });
   });
 
   wss.on('connection', (ws: WebSocket) => {

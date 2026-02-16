@@ -32,6 +32,7 @@ process.on('uncaughtException', (err) => {
 });
 
 const credentialStore = new CredentialStore();
+credentialStore.startProactiveRefresh();
 const projectRepoStore = new ProjectRepoStore();
 
 // Log auth status at startup
@@ -40,6 +41,8 @@ switch (authStatus.method) {
   case 'oauth_credentials_file':
     console.log(`Auth: OAuth credentials file (${authStatus.credentialsPath})`);
     if (authStatus.maskedToken) console.log(`  Token: ${authStatus.maskedToken}`);
+    if (authStatus.tokenStatus) console.log(`  Token status: ${authStatus.tokenStatus}`);
+    if (authStatus.tokenExpiresAt) console.log(`  Expires: ${authStatus.tokenExpiresAt}`);
     break;
   case 'none':
     console.warn('Auth: No OAuth credentials configured — configure via Settings');
@@ -61,7 +64,7 @@ const app = createApp(sessionManager, credentialStore, projectRepoStore);
 const server = createServer(app);
 
 // Set up WebSocket servers (both noServer mode)
-const { wss: clientWss } = setupWebSocket(server, sessionManager, notifier);
+const { wss: clientWss } = setupWebSocket(server, sessionManager, credentialStore, notifier);
 const internalWss = setupInternalWebSocket(sessionManager);
 
 // Route HTTP upgrade requests to the correct WebSocket server
