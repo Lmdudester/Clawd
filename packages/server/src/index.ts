@@ -60,11 +60,21 @@ const sessionManager = new SessionManager(credentialStore, containerManager);
 const app = createApp(sessionManager, credentialStore, projectRepoStore);
 const server = createServer(app);
 
-// Set up client-facing WebSocket
-setupWebSocket(server, sessionManager, notifier);
+// Set up WebSocket servers (both noServer mode)
+const { wss: clientWss } = setupWebSocket(server, sessionManager, notifier);
+const internalWss = setupInternalWebSocket(sessionManager);
 
-// Set up internal WebSocket for session agents
-setupInternalWebSocket(server, sessionManager);
+// Route HTTP upgrade requests to the correct WebSocket server
+server.on('upgrade', (req, socket, head) => {
+  const { pathname } = new URL(req.url ?? '/', `http://${req.headers.host}`);
+  if (pathname === '/ws') {
+    clientWss.handleUpgrade(req, socket, head, (ws) => clientWss.emit('connection', ws, req));
+  } else if (pathname === '/internal/session') {
+    internalWss.handleUpgrade(req, socket, head, (ws) => internalWss.emit('connection', ws, req));
+  } else {
+    socket.destroy();
+  }
+});
 
 // Initialize container manager (async — creates network, prunes stale containers)
 containerManager.initialize().then(() => {

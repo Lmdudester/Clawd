@@ -5,8 +5,8 @@ import { MessageRouter } from './message-router.js';
 import type { SessionManager } from '../sessions/session-manager.js';
 import type { Notifier } from '../notifications/notifier.js';
 
-export function setupWebSocket(server: Server, sessionManager: SessionManager, notifier?: Notifier): ConnectionManager {
-  const wss = new WebSocketServer({ server, path: '/ws' });
+export function setupWebSocket(server: Server, sessionManager: SessionManager, notifier?: Notifier): { connectionManager: ConnectionManager; wss: WebSocketServer } {
+  const wss = new WebSocketServer({ noServer: true });
   const connectionManager = new ConnectionManager();
   const messageRouter = new MessageRouter(sessionManager, connectionManager);
 
@@ -94,5 +94,5 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, n
     });
   });
 
-  return connectionManager;
+  return { connectionManager, wss };
 }

@@ -2,12 +2,11 @@
 // Session containers connect here to proxy messages between the SDK and the master.
 
 import { WebSocketServer, type WebSocket } from 'ws';
-import type { Server } from 'http';
 import type { AgentToMasterMessage } from '@clawd/shared';
 import type { SessionManager } from '../sessions/session-manager.js';
 
-export function setupInternalWebSocket(server: Server, sessionManager: SessionManager): void {
-  const wss = new WebSocketServer({ server, path: '/internal/session' });
+export function setupInternalWebSocket(sessionManager: SessionManager): WebSocketServer {
+  const wss = new WebSocketServer({ noServer: true });
 
   wss.on('connection', (ws: WebSocket) => {
     console.log('[internal-ws] Agent connected');
@@ -61,4 +60,6 @@ export function setupInternalWebSocket(server: Server, sessionManager: SessionMa
       }
     });
   });
+
+  return wss;
 }
