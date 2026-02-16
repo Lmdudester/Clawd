@@ -5,6 +5,7 @@ import { authRouter } from './routes/auth.js';
 import { createSessionRoutes } from './routes/sessions.js';
 import { createSettingsRoutes } from './routes/settings.js';
 import { createUsageRoutes } from './routes/usage.js';
+import { createRepoRoutes } from './routes/repos.js';
 import type { SessionManager } from './sessions/session-manager.js';
 import type { CredentialStore } from './settings/credential-store.js';
 import type { ProjectRepoStore } from './settings/project-repos.js';
@@ -21,6 +22,7 @@ export function createApp(sessionManager: SessionManager, credentialStore: Crede
   app.use('/api/sessions', createSessionRoutes(sessionManager));
   app.use('/api/settings', createSettingsRoutes(credentialStore, projectRepoStore));
   app.use('/api/usage', createUsageRoutes(credentialStore));
+  app.use('/api/repos', createRepoRoutes());
 
   // Serve static client build in production
   const clientDist = join(__dirname, '../../client/dist');

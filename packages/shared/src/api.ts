@@ -66,6 +66,22 @@ export type ProjectFolder = ProjectRepo;
 export type ProjectFoldersResponse = ProjectReposResponse;
 export type SetProjectFoldersRequest = SetProjectReposRequest;
 
+// Branch API types
+
+export interface BranchesResponse {
+  branches: string[];
+}
+
+export interface CreateBranchRequest {
+  repoUrl: string;
+  branchName: string;
+  fromBranch?: string;
+}
+
+export interface CreateBranchResponse {
+  branch: string;
+}
+
 // Usage / Rate Limit types
 
 // Standard API tier bucket (requests, tokens, input-tokens, output-tokens)

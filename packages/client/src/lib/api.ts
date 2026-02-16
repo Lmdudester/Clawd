@@ -12,6 +12,9 @@ import type {
   ProjectReposResponse,
   ProjectRepo,
   UsageResponse,
+  BranchesResponse,
+  CreateBranchRequest,
+  CreateBranchResponse,
 } from '@clawd/shared';
 
 const BASE_URL = '/api';
@@ -98,6 +101,16 @@ export const api = {
     request<ProjectReposResponse>('/settings/repos', {
       method: 'PUT',
       body: JSON.stringify({ repos }),
+    }),
+
+  // Repos / Branches
+  getBranches: (repoUrl: string) =>
+    request<BranchesResponse>(`/repos/branches?repoUrl=${encodeURIComponent(repoUrl)}`),
+
+  createBranch: (data: CreateBranchRequest) =>
+    request<CreateBranchResponse>('/repos/branches', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 
   // Usage
