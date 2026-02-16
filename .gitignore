@@ -7,7 +7,6 @@ claude-auth.json
 .DS_Store
 
 # User-specific local data
-project-folders.json
 project-repos.json
 .claude/settings.local.json
 .claude/plans/

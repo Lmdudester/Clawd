@@ -93,16 +93,6 @@ export const api = {
       body: JSON.stringify({ repos }),
     }),
 
-  // Legacy aliases
-  getProjectFolders: () =>
-    request<ProjectReposResponse>('/settings/repos'),
-
-  setProjectFolders: (repos: ProjectRepo[]) =>
-    request<ProjectReposResponse>('/settings/repos', {
-      method: 'PUT',
-      body: JSON.stringify({ repos }),
-    }),
-
   // Repos / Branches
   getBranches: (repoUrl: string) =>
     request<BranchesResponse>(`/repos/branches?repoUrl=${encodeURIComponent(repoUrl)}`),

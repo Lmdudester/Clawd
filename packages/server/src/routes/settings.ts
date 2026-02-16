@@ -56,10 +56,5 @@ export function createSettingsRoutes(credentialStore: CredentialStore, projectRe
     res.json({ repos: projectRepoStore.getRepos() });
   });
 
-  // Legacy: keep /folders endpoint for backwards compatibility
-  router.get('/folders', (req, res) => {
-    res.json({ repos: projectRepoStore.getRepos() });
-  });
-
   return router;
 }

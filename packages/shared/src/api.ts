@@ -44,7 +44,7 @@ export interface DiscoverCredentialsResponse {
   paths: string[];
 }
 
-// Project Repos API types (evolved from ProjectFolder)
+// Project Repos API types
 
 export interface ProjectRepo {
   url: string;
@@ -60,11 +60,6 @@ export interface ProjectReposResponse {
 export interface SetProjectReposRequest {
   repos: ProjectRepo[];
 }
-
-// Legacy aliases for backwards compatibility during migration
-export type ProjectFolder = ProjectRepo;
-export type ProjectFoldersResponse = ProjectReposResponse;
-export type SetProjectFoldersRequest = SetProjectReposRequest;
 
 // Branch API types
 

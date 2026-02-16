@@ -24,5 +24,5 @@ export const config = {
   sessionPidsLimit: parseInt(process.env.SESSION_PIDS_LIMIT || '256'),
 
   // Project repos config file path
-  projectReposPath: process.env.PROJECT_REPOS_PATH || process.env.PROJECT_FOLDERS_PATH || resolve(projectRoot, 'project-repos.json'),
+  projectReposPath: process.env.PROJECT_REPOS_PATH || resolve(projectRoot, 'project-repos.json'),
 };
