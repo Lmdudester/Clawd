@@ -20,8 +20,9 @@ const READONLY_TOOLS = new Set([
 ]);
 const READONLY_MCP_PREFIXES = ['mcp__playwright__'];
 
-// gh CLI subcommands that are read-only (no mutations)
-const READONLY_GH_PATTERNS = [
+// Bash commands that are safe to auto-approve without user interaction
+const READONLY_BASH_PATTERNS = [
+  // gh CLI read-only subcommands
   /^gh\s+repo\s+view\b/,
   /^gh\s+pr\s+(list|view|status|checks|diff)\b/,
   /^gh\s+issue\s+(list|view|status)\b/,
@@ -31,6 +32,11 @@ const READONLY_GH_PATTERNS = [
   /^gh\s+api\s/,          // gh api (GET by default)
   /^gh\s+search\s/,       // gh search repos/issues/prs/commits
   /^gh\s+status\b/,
+  // General-purpose safe commands
+  /^sleep\s/,
+  /^curl\s/,
+  /^head\b/,
+  /^tail\b/,
 ];
 
 function isReadOnlyBash(toolName: string, input: Record<string, unknown>): boolean {
@@ -38,7 +44,7 @@ function isReadOnlyBash(toolName: string, input: Record<string, unknown>): boole
   const cmd = (typeof input.command === 'string' ? input.command : '').trim();
   // Reject gh api with --method that isn't GET
   if (/^gh\s+api\s/.test(cmd) && /--method\s+(?!GET\b)/i.test(cmd)) return false;
-  return READONLY_GH_PATTERNS.some(p => p.test(cmd));
+  return READONLY_BASH_PATTERNS.some(p => p.test(cmd));
 }
 
 interface SDKRunnerOptions {
