@@ -9,8 +9,8 @@ import type {
   AuthStatusResponse,
   SetCredentialsPathRequest,
   DiscoverCredentialsResponse,
-  ProjectFoldersResponse,
-  ProjectFolder,
+  ProjectReposResponse,
+  ProjectRepo,
   UsageResponse,
 } from '@clawd/shared';
 
@@ -80,14 +80,24 @@ export const api = {
   clearAuth: () =>
     request<AuthStatusResponse>('/settings/auth', { method: 'DELETE' }),
 
-  // Project Folders
-  getProjectFolders: () =>
-    request<ProjectFoldersResponse>('/settings/folders'),
+  // Project Repos
+  getProjectRepos: () =>
+    request<ProjectReposResponse>('/settings/repos'),
 
-  setProjectFolders: (folders: ProjectFolder[]) =>
-    request<ProjectFoldersResponse>('/settings/folders', {
+  setProjectRepos: (repos: ProjectRepo[]) =>
+    request<ProjectReposResponse>('/settings/repos', {
       method: 'PUT',
-      body: JSON.stringify({ folders }),
+      body: JSON.stringify({ repos }),
+    }),
+
+  // Legacy aliases
+  getProjectFolders: () =>
+    request<ProjectReposResponse>('/settings/repos'),
+
+  setProjectFolders: (repos: ProjectRepo[]) =>
+    request<ProjectReposResponse>('/settings/repos', {
+      method: 'PUT',
+      body: JSON.stringify({ repos }),
     }),
 
   // Usage

@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { authMiddleware } from '../auth/middleware.js';
 import type { CredentialStore } from '../settings/credential-store.js';
-import type { ProjectFolderStore } from '../settings/project-folders.js';
-import type { SetCredentialsPathRequest, SetProjectFoldersRequest } from '@clawd/shared';
+import type { ProjectRepoStore } from '../settings/project-repos.js';
+import type { SetCredentialsPathRequest, SetProjectReposRequest } from '@clawd/shared';
 
-export function createSettingsRoutes(credentialStore: CredentialStore, projectFolderStore: ProjectFolderStore): Router {
+export function createSettingsRoutes(credentialStore: CredentialStore, projectRepoStore: ProjectRepoStore): Router {
   const router = Router();
   router.use(authMiddleware);
 
@@ -41,19 +41,24 @@ export function createSettingsRoutes(credentialStore: CredentialStore, projectFo
     res.json(credentialStore.getStatus());
   });
 
-  // Project Folders
-  router.get('/folders', (req, res) => {
-    res.json({ folders: projectFolderStore.getFolders() });
+  // Project Repos
+  router.get('/repos', (req, res) => {
+    res.json({ repos: projectRepoStore.getRepos() });
   });
 
-  router.put('/folders', (req, res) => {
-    const { folders } = req.body as SetProjectFoldersRequest;
-    if (!Array.isArray(folders)) {
-      res.status(400).json({ error: 'folders must be an array' });
+  router.put('/repos', (req, res) => {
+    const { repos } = req.body as SetProjectReposRequest;
+    if (!Array.isArray(repos)) {
+      res.status(400).json({ error: 'repos must be an array' });
       return;
     }
-    projectFolderStore.setFolders(folders);
-    res.json({ folders: projectFolderStore.getFolders() });
+    projectRepoStore.setRepos(repos);
+    res.json({ repos: projectRepoStore.getRepos() });
+  });
+
+  // Legacy: keep /folders endpoint for backwards compatibility
+  router.get('/folders', (req, res) => {
+    res.json({ repos: projectRepoStore.getRepos() });
   });
 
   return router;

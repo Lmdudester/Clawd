@@ -12,10 +12,12 @@ delete process.env.CLAUDECODE;
 import { createServer } from 'http';
 import { createApp } from './app.js';
 import { SessionManager } from './sessions/session-manager.js';
+import { ContainerManager } from './sessions/container-manager.js';
 import { CredentialStore } from './settings/credential-store.js';
-import { ProjectFolderStore } from './settings/project-folders.js';
+import { ProjectRepoStore } from './settings/project-repos.js';
 import { Notifier } from './notifications/notifier.js';
 import { setupWebSocket } from './ws/handler.js';
+import { setupInternalWebSocket } from './ws/internal-handler.js';
 import { config } from './config.js';
 import { networkInterfaces } from 'os';
 
@@ -30,7 +32,7 @@ process.on('uncaughtException', (err) => {
 });
 
 const credentialStore = new CredentialStore();
-const projectFolderStore = new ProjectFolderStore();
+const projectRepoStore = new ProjectRepoStore();
 
 // Log auth status at startup
 const authStatus = credentialStore.getStatus();
@@ -51,11 +53,26 @@ if (notifier.enabled) {
   console.log('Notifications: disabled (set NTFY_TOPIC to enable)');
 }
 
-const sessionManager = new SessionManager(credentialStore);
-const app = createApp(sessionManager, credentialStore, projectFolderStore);
+// Initialize container manager
+const containerManager = new ContainerManager();
+
+const sessionManager = new SessionManager(credentialStore, containerManager);
+const app = createApp(sessionManager, credentialStore, projectRepoStore);
 const server = createServer(app);
 
+// Set up client-facing WebSocket
 setupWebSocket(server, sessionManager, notifier);
+
+// Set up internal WebSocket for session agents
+setupInternalWebSocket(server, sessionManager);
+
+// Initialize container manager (async — creates network, prunes stale containers)
+containerManager.initialize().then(() => {
+  console.log('[containers] Container manager initialized');
+}).catch((err) => {
+  console.error('[containers] Failed to initialize container manager:', err.message);
+  console.warn('[containers] Session containers will not work until Docker is available');
+});
 
 server.listen(config.port, config.host, () => {
   console.log(`\n  Clawd server running on http://${config.host}:${config.port}`);

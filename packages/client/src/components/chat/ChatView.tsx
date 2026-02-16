@@ -91,7 +91,7 @@ export function ChatView() {
   const streamingKey = Array.from(streamingTokens.keys()).find((k) => k.startsWith(`${id}:`));
   const streamingText = streamingKey ? streamingTokens.get(streamingKey) ?? '' : '';
 
-  const isInputDisabled = session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer' || session?.status === 'terminated';
+  const isInputDisabled = session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer' || session?.status === 'terminated' || session?.status === 'starting';
   const isInterruptible = session?.status === 'running' || session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer';
 
   return (
@@ -118,7 +118,10 @@ export function ChatView() {
             )}
             {session && <StatusBadge status={session.status} />}
           </div>
-          <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded truncate max-w-[200px]">{session?.cwd.split(/[/\\]/).filter(Boolean).pop()}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded truncate max-w-[150px]">{session?.repoUrl.split('/').filter(Boolean).pop()?.replace(/\.git$/, '')}</span>
+            <span className="text-sm text-slate-400 bg-slate-800/60 border border-slate-700/50 px-1.5 py-0.5 rounded font-mono text-xs">{session?.branch}</span>
+          </div>
         </div>
         <button
           onClick={() => setSettingsOpen(true)}

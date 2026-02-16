@@ -69,6 +69,10 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, n
         pendingResultPush.set(sessionId, timeout);
         break;
       }
+      case 'models_list': {
+        connectionManager.broadcast(sessionId, { type: 'models_list', sessionId, models: data });
+        break;
+      }
     }
   });
 

@@ -3,6 +3,7 @@
 export type PermissionMode = 'normal' | 'auto_edits' | 'dangerous' | 'plan';
 
 export type SessionStatus =
+  | 'starting'
   | 'idle'
   | 'running'
   | 'awaiting_approval'
@@ -13,7 +14,8 @@ export type SessionStatus =
 export interface SessionInfo {
   id: string;
   name: string;
-  cwd: string;
+  repoUrl: string;
+  branch: string;
   status: SessionStatus;
   createdAt: string;
   lastMessageAt: string | null;

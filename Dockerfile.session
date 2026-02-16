@@ -1,0 +1,62 @@
+FROM node:22-bookworm
+
+# ── System packages ──────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        python3 \
+        python3-pip \
+        python3-venv \
+        python3-dev \
+        sqlite3 \
+        ripgrep \
+        tree \
+        jq \
+        procps \
+        lsof \
+        zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── pnpm via corepack (bundled with Node.js 22) ─────────────────
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Install Claude Code CLI globally
+RUN npm install -g @anthropic-ai/claude-code
+
+# Install Playwright MCP server globally and Chromium + system deps
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+RUN npm install -g @playwright/mcp \
+    && npx --package=@playwright/mcp playwright install --with-deps chromium \
+    && chmod -R o+rwx /opt/playwright-browsers
+
+# ── Build the session agent ──────────────────────────────────────
+WORKDIR /session-agent
+
+# Copy workspace root files for npm workspaces
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/shared/ ./packages/shared/
+COPY packages/session-agent/ ./packages/session-agent/
+
+# We need stub package.json files for the other workspaces so npm ci doesn't fail
+RUN mkdir -p packages/server packages/client \
+    && echo '{"name":"@clawd/server","version":"1.0.0","private":true}' > packages/server/package.json \
+    && echo '{"name":"@clawd/client","version":"1.0.0","private":true}' > packages/client/package.json
+
+# Install deps and build
+RUN npm ci \
+    && npm run build -w packages/shared \
+    && npm run build -w packages/session-agent
+
+# ── Set up non-root user ─────────────────────────────────────────
+RUN mkdir -p /home/node/.claude /workspace \
+    && echo '{"hasCompletedOnboarding":true}' > /home/node/.claude.json \
+    && chown -R node:node /home/node/.claude /home/node/.claude.json /workspace /session-agent
+
+USER node
+ENV HOME=/home/node
+RUN git config --global --add safe.directory '*'
+
+# ── Session entrypoint ───────────────────────────────────────────
+COPY --chown=node:node scripts/session-entrypoint.sh /session-entrypoint.sh
+
+ENTRYPOINT ["/bin/sh", "/session-entrypoint.sh"]

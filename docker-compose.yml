@@ -2,19 +2,37 @@ services:
   clawd:
     build: .
     container_name: clawd
+    networks:
+      - clawd-network
     ports:
       - "4000:4000"
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
       - /c:/host/c
       - ./credentials.json:/app/credentials.json:ro
-      - ./project-folders.json:/app/project-folders.json
+      - ./project-repos.json:/app/project-repos.json
     environment:
       - CLAWD_HOST=0.0.0.0
       - CLAWD_PORT=4000
       - HOST_DRIVE_PREFIX=/host/c
       - HOST_CLAUDE_DIR=/host/c/Users/lmdud/.claude
+      - CLAWD_SESSION_IMAGE=clawd-session:latest
+      - CLAWD_NETWORK=clawd-network
       - CREDENTIALS_PATH=/app/credentials.json
-      - PROJECT_FOLDERS_PATH=/app/project-folders.json
+      - PROJECT_REPOS_PATH=/app/project-repos.json
     env_file:
       - .env
     restart: unless-stopped
+
+  # Build the session image alongside the master (never started as a service)
+  clawd-session:
+    build:
+      context: .
+      dockerfile: Dockerfile.session
+    image: clawd-session:latest
+    profiles: ["build-only"]
+
+networks:
+  clawd-network:
+    driver: bridge
+    name: clawd-network

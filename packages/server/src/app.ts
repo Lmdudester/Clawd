@@ -7,11 +7,11 @@ import { createSettingsRoutes } from './routes/settings.js';
 import { createUsageRoutes } from './routes/usage.js';
 import type { SessionManager } from './sessions/session-manager.js';
 import type { CredentialStore } from './settings/credential-store.js';
-import type { ProjectFolderStore } from './settings/project-folders.js';
+import type { ProjectRepoStore } from './settings/project-repos.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export function createApp(sessionManager: SessionManager, credentialStore: CredentialStore, projectFolderStore: ProjectFolderStore) {
+export function createApp(sessionManager: SessionManager, credentialStore: CredentialStore, projectRepoStore: ProjectRepoStore) {
   const app = express();
 
   app.use(express.json());
@@ -19,7 +19,7 @@ export function createApp(sessionManager: SessionManager, credentialStore: Crede
   // API routes
   app.use('/api/auth', authRouter);
   app.use('/api/sessions', createSessionRoutes(sessionManager));
-  app.use('/api/settings', createSettingsRoutes(credentialStore, projectFolderStore));
+  app.use('/api/settings', createSettingsRoutes(credentialStore, projectRepoStore));
   app.use('/api/usage', createUsageRoutes(credentialStore));
 
   // Serve static client build in production

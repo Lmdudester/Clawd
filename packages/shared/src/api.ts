@@ -11,7 +11,8 @@ export interface LoginResponse {
 
 export interface CreateSessionRequest {
   name: string;
-  cwd: string;
+  repoUrl: string;
+  branch: string;
 }
 
 export interface SessionListResponse {
@@ -43,21 +44,27 @@ export interface DiscoverCredentialsResponse {
   paths: string[];
 }
 
-// Project Folders API types
+// Project Repos API types (evolved from ProjectFolder)
 
-export interface ProjectFolder {
-  path: string;
+export interface ProjectRepo {
+  url: string;
   label: string;
+  defaultBranch: string;
   isDefault: boolean;
 }
 
-export interface ProjectFoldersResponse {
-  folders: ProjectFolder[];
+export interface ProjectReposResponse {
+  repos: ProjectRepo[];
 }
 
-export interface SetProjectFoldersRequest {
-  folders: ProjectFolder[];
+export interface SetProjectReposRequest {
+  repos: ProjectRepo[];
 }
+
+// Legacy aliases for backwards compatibility during migration
+export type ProjectFolder = ProjectRepo;
+export type ProjectFoldersResponse = ProjectReposResponse;
+export type SetProjectFoldersRequest = SetProjectReposRequest;
 
 // Usage / Rate Limit types
 

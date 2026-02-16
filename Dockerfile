@@ -1,33 +1,10 @@
 FROM node:22-bookworm
 
-# ── System packages ──────────────────────────────────────────────
+# ── System packages (minimal — session containers have the full set) ──
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
-        python3 \
-        python3-pip \
-        python3-venv \
-        python3-dev \
-        sqlite3 \
-        ripgrep \
-        tree \
         jq \
-        procps \
-        lsof \
-        zip \
     && rm -rf /var/lib/apt/lists/*
-
-# ── pnpm via corepack (bundled with Node.js 22) ─────────────────
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# Install Claude Code CLI globally
-RUN npm install -g @anthropic-ai/claude-code
-
-# Install Playwright MCP server globally and Chromium + system deps
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
-RUN npm install -g @playwright/mcp \
-    && npx --package=@playwright/mcp playwright install --with-deps chromium \
-    && chmod -R o+rwx /opt/playwright-browsers
 
 # Create app directory
 RUN mkdir -p /app/src
@@ -38,11 +15,7 @@ WORKDIR /app
 COPY scripts/entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
-# Fix WSL/Docker 9p symlink mismatch: pnpm symlinks resolve to /mnt/host/c/...
-# but the actual mount is at /host/c, so create a bridge symlink
-RUN ln -s /host /mnt/host
-
-# Set up non-root user (Claude Code rejects --dangerously-skip-permissions as root)
+# Set up non-root user
 RUN mkdir -p /home/node/.claude \
     && echo '{"hasCompletedOnboarding":true}' > /home/node/.claude.json \
     && chown -R node:node /app /home/node/.claude /home/node/.claude.json

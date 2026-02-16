@@ -156,6 +156,11 @@ export class CredentialStore {
     }
   }
 
+  // Get the currently selected .claude directory path (for container volume mounts).
+  getSelectedClaudeDir(): string | null {
+    return this.storedAuth?.claudeDir ?? null;
+  }
+
   // Clear stored credentials path and remove symlink.
   clear(): void {
     if (config.hostDrivePrefix) {

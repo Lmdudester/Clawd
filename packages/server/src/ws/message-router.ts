@@ -64,14 +64,14 @@ export class MessageRouter {
             ws.send(JSON.stringify({
               type: 'approval_request',
               sessionId: message.sessionId,
-              approval: session.pendingApproval.approval,
+              approval: session.pendingApproval,
             }));
           }
           if (session.pendingQuestion) {
             ws.send(JSON.stringify({
               type: 'question',
               sessionId: message.sessionId,
-              question: session.pendingQuestion.question,
+              question: session.pendingQuestion,
             }));
           }
         }
@@ -113,9 +113,7 @@ export class MessageRouter {
         break;
 
       case 'get_models':
-        this.sessionManager.getSupportedModels(message.sessionId).then((models) => {
-          ws.send(JSON.stringify({ type: 'models_list', sessionId: message.sessionId, models }));
-        });
+        this.sessionManager.getSupportedModels(message.sessionId);
         break;
 
       case 'set_model':

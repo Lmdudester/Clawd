@@ -15,4 +15,14 @@ export const config = {
   claudeAuthPath: resolve(projectRoot, 'claude-auth.json'),
   get ntfyTopic() { return process.env.NTFY_TOPIC || ''; },
   get ntfyServer() { return process.env.NTFY_SERVER || 'https://ntfy.sh'; },
+
+  // Docker container management
+  sessionImage: process.env.CLAWD_SESSION_IMAGE || 'clawd-session:latest',
+  networkName: process.env.CLAWD_NETWORK || 'clawd-network',
+  sessionMemoryLimit: parseInt(process.env.SESSION_MEMORY_LIMIT || String(4 * 1024 * 1024 * 1024)), // 4GB
+  sessionCpuShares: parseInt(process.env.SESSION_CPU_SHARES || '512'),
+  sessionPidsLimit: parseInt(process.env.SESSION_PIDS_LIMIT || '256'),
+
+  // Project repos config file path
+  projectReposPath: process.env.PROJECT_REPOS_PATH || process.env.PROJECT_FOLDERS_PATH || resolve(projectRoot, 'project-repos.json'),
 };

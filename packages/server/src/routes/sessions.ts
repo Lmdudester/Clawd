@@ -14,17 +14,21 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Create a new session
-  router.post('/', (req: AuthRequest, res) => {
-    const { name, cwd } = req.body as CreateSessionRequest;
+  router.post('/', async (req: AuthRequest, res) => {
+    const { name, repoUrl, branch } = req.body as CreateSessionRequest;
 
-    if (!name || !cwd) {
-      const error: ErrorResponse = { error: 'Name and cwd are required' };
+    if (!name || !repoUrl || !branch) {
+      const error: ErrorResponse = { error: 'Name, repoUrl, and branch are required' };
       res.status(400).json(error);
       return;
     }
 
-    const session = sessionManager.createSession(name, cwd);
-    res.status(201).json({ session });
+    try {
+      const session = await sessionManager.createSession(name, repoUrl, branch);
+      res.status(201).json({ session });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to create session' });
+    }
   });
 
   // Get session details
@@ -42,14 +46,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Delete (terminate) session
-  router.delete('/:id', (req, res) => {
+  router.delete('/:id', async (req, res) => {
     const session = sessionManager.getSession(req.params.id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
 
-    sessionManager.deleteSession(req.params.id);
+    await sessionManager.deleteSession(req.params.id);
     res.status(204).end();
   });
 
