@@ -8,6 +8,7 @@ claude-auth.json
 
 # User-specific local data
 project-folders.json
+project-repos.json
 .claude/settings.local.json
 .claude/plans/
 
