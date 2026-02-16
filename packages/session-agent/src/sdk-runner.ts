@@ -198,20 +198,12 @@ export class SDKRunner {
 
   private interrupt(): void {
     this.interrupted = true;
-
-    // Set the SDK's internal stop flag synchronously FIRST, so that when
-    // resolving pending promises unblocks the SDK, it immediately sees the
-    // interrupt flag and exits instead of starting a new API call.
+    // The SDK's interrupt() aborts the AbortSignal passed to canUseTool,
+    // which resolves our pending Promise.race with a deny. No need to
+    // manually resolve pendingApproval/pendingQuestion.
     this.queryStream?.interrupt();
-
-    if (this.pendingApproval) {
-      this.pendingApproval.resolve({ behavior: 'deny', message: 'Interrupted by user' });
-      this.pendingApproval = null;
-    }
-    if (this.pendingQuestion) {
-      this.pendingQuestion.resolve({});
-      this.pendingQuestion = null;
-    }
+    this.pendingApproval = null;
+    this.pendingQuestion = null;
   }
 
   private async setModel(model: string): Promise<void> {
@@ -315,7 +307,7 @@ export class SDKRunner {
           systemPrompt,
           permissionMode: this.permissionMode === 'plan' ? 'plan' : 'default',
           mcpServers,
-          canUseTool: async (toolName, input) => {
+          canUseTool: async (toolName, input, options) => {
             // Dangerous: approve everything
             if (this.permissionMode === 'dangerous') {
               console.log(`[agent] auto-approved: ${toolName}`);
@@ -331,7 +323,7 @@ export class SDKRunner {
                 return { behavior: 'allow', updatedInput: input };
               }
             }
-            return this.handleToolApproval(toolName, input);
+            return this.handleToolApproval(toolName, input, options?.signal);
           },
           stderr: (data: string) => {
             console.error(`[agent] claude stderr: ${data}`);
@@ -367,12 +359,13 @@ export class SDKRunner {
   private async handleToolApproval(
     toolName: string,
     input: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<{ behavior: 'allow'; updatedInput: Record<string, unknown> } | { behavior: 'deny'; message: string }> {
     // --- Pre-gate fast paths (no serialization needed) ---
 
     // Handle AskUserQuestion specially
     if (toolName === 'AskUserQuestion') {
-      return this.handleAskUserQuestion(input);
+      return this.handleAskUserQuestion(input, signal);
     }
 
     // Plan mode guard: allow read-only tools, deny mutations (no gate)
@@ -404,14 +397,14 @@ export class SDKRunner {
       if (previousGate) await previousGate;
 
       // If interrupted while waiting in the queue, deny immediately
-      if (this.interrupted) {
+      if (this.interrupted || signal?.aborted) {
         console.log(`[agent] queued approval denied (interrupted): ${toolName}`);
         return { behavior: 'deny', message: 'Interrupted by user' };
       }
 
       // ExitPlanMode — show approval dialog, switch to normal only if approved
       if (toolName === 'ExitPlanMode' && this.permissionMode === 'plan') {
-        const result = await this.sendApprovalAndAwait(toolName, input);
+        const result = await this.sendApprovalAndAwait(toolName, input, signal);
 
         if (result.behavior === 'allow') {
           this.permissionMode = 'normal';
@@ -429,7 +422,7 @@ export class SDKRunner {
       }
 
       // Normal approval dialog
-      const result = await this.sendApprovalAndAwait(toolName, input);
+      const result = await this.sendApprovalAndAwait(toolName, input, signal);
 
       if (result.behavior === 'allow') {
         console.log(`[agent] tool approved: ${toolName}`);
@@ -446,6 +439,7 @@ export class SDKRunner {
   private async sendApprovalAndAwait(
     toolName: string,
     input: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<{ behavior: 'allow' | 'deny'; message?: string }> {
     const approvalId = uuid();
     const approval: PendingApproval = {
@@ -458,7 +452,7 @@ export class SDKRunner {
     this.masterClient.send({ type: 'status_update', status: 'awaiting_approval' });
     this.masterClient.send({ type: 'approval_request', approval });
 
-    const result = await Promise.race([
+    const promises: Promise<{ behavior: 'allow' | 'deny'; message?: string }>[] = [
       new Promise<{ behavior: 'allow' | 'deny'; message?: string }>((resolve) => {
         this.pendingApproval = { approval, resolve };
       }),
@@ -468,7 +462,14 @@ export class SDKRunner {
           resolve({ behavior: 'deny', message: 'Approval timed out (5 min)' });
         }, 5 * 60 * 1000)
       ),
-    ]);
+    ];
+    if (signal) {
+      promises.push(new Promise((resolve) => {
+        if (signal.aborted) return resolve({ behavior: 'deny', message: 'Interrupted by user' });
+        signal.addEventListener('abort', () => resolve({ behavior: 'deny', message: 'Interrupted by user' }), { once: true });
+      }));
+    }
+    const result = await Promise.race(promises);
 
     this.pendingApproval = null;
     this.masterClient.send({ type: 'status_update', status: 'running' });
@@ -478,7 +479,8 @@ export class SDKRunner {
 
   private async handleAskUserQuestion(
     input: Record<string, unknown>,
-  ): Promise<{ behavior: 'allow'; updatedInput: Record<string, unknown> }> {
+    signal?: AbortSignal,
+  ): Promise<{ behavior: 'allow'; updatedInput: Record<string, unknown> } | { behavior: 'deny'; message: string }> {
     const questionId = uuid();
     const question: PendingQuestion = {
       id: questionId,
@@ -489,12 +491,22 @@ export class SDKRunner {
     this.masterClient.send({ type: 'status_update', status: 'awaiting_answer' });
     this.masterClient.send({ type: 'question', question });
 
-    const answers = await new Promise<Record<string, string>>((resolve) => {
-      this.pendingQuestion = { question, resolve };
-    });
+    const answers = await Promise.race([
+      new Promise<Record<string, string>>((resolve) => {
+        this.pendingQuestion = { question, resolve };
+      }),
+      ...(signal ? [new Promise<never>((_, reject) => {
+        if (signal.aborted) return reject(new Error('Interrupted'));
+        signal.addEventListener('abort', () => reject(new Error('Interrupted')), { once: true });
+      })] : []),
+    ]).catch(() => null);
 
     this.pendingQuestion = null;
     this.masterClient.send({ type: 'status_update', status: 'running' });
+
+    if (answers === null) {
+      return { behavior: 'deny', message: 'Interrupted by user' };
+    }
 
     return {
       behavior: 'allow',
