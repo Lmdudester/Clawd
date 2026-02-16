@@ -55,6 +55,9 @@ RUN npm ci \
     && npm run build -w packages/shared \
     && npm run build -w packages/session-agent
 
+# ── Bake shared skills into the image ────────────────────────────
+COPY session-skills/ /home/node/.claude/skills/
+
 # ── Set up non-root user ─────────────────────────────────────────
 RUN mkdir -p /home/node/.claude /workspace \
     && echo '{"hasCompletedOnboarding":true}' > /home/node/.claude.json \
