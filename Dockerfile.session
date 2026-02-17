@@ -46,7 +46,7 @@ RUN npm install -g @anthropic-ai/claude-code
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 RUN npm install -g @playwright/mcp playwright \
     && npx --package=@playwright/mcp playwright install --with-deps chromium \
-    && chmod -R o+rwx /opt/playwright-browsers
+    && chmod -R a+rwx /opt/playwright-browsers
 
 # ── Build the session agent ──────────────────────────────────────
 WORKDIR /session-agent

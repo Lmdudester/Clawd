@@ -316,7 +316,16 @@ export class SDKRunner {
       }
 
       // Build system prompt
-      const systemPrompt: any = { type: 'preset', preset: 'claude_code' };
+      const systemPrompt: any = {
+        type: 'preset',
+        preset: 'claude_code',
+        append: [
+          'You are running inside a Clawd session container.',
+          'Be efficient with tokens — avoid unnecessary codebase exploration.',
+          'When a skill provides step-by-step instructions, follow them directly without exploring first.',
+          'If you need project context, check CLAUDE.md before reading individual source files.',
+        ].join(' '),
+      };
 
       const queryStream = query({
         prompt: this.channel as AsyncIterable<any>,
@@ -326,6 +335,7 @@ export class SDKRunner {
           abortController: this.abortController,
           includePartialMessages: true,
           systemPrompt,
+          settingSources: ['user', 'project'],
           permissionMode: this.permissionMode === 'plan' ? 'plan' : 'default',
           mcpServers,
           canUseTool: async (toolName, input, options) => {

@@ -6,63 +6,78 @@ user-invocable: true
 
 # Self-Test Skill
 
-Use this skill to spin up a separate test Clawd instance and run end-to-end tests against it using Playwright. This requires a session with Docker access.
+**IMPORTANT: Do NOT explore the codebase. Do NOT read source files, package.json, or project structure. Go directly to Step 1. Simple E2E tests should complete under $0.50.**
 
-## Prerequisites
+Spin up a separate test Clawd instance and run E2E tests against it using Playwright.
 
-- This session must have been created with **Docker access enabled**
-- The `clawd:latest` and `clawd-session:latest` images must exist on the host
-- `CLAUDE_CODE_OAUTH_TOKEN` must be set (forwarded automatically by the session agent)
+**CRITICAL: Do NOT navigate to `clawd:4000` or any parent instance URL. You must spin up your OWN test instance using the script below and test against THAT.**
 
-## Instructions
+## Step 1: Spin Up a Test Instance
 
-### 1. Spin Up a Test Instance
-
-Run the test launcher script:
+Detect the current branch and launch the test instance:
 
 ```bash
-bash /workspace/scripts/test-clawd.sh --branch <branch>
+BRANCH=$(git -C /workspace branch --show-current 2>/dev/null || echo "main")
+echo "Testing branch: $BRANCH"
+bash /workspace/scripts/test-clawd.sh --branch "$BRANCH"
 ```
 
-- Replace `<branch>` with the branch you want to test (e.g. `main`, `self-testing`)
 - The script outputs the test instance URL (e.g. `http://test-clawd-1234567890:5000`) and container name
 - Login credentials are `test` / `test`
 - Wait for the script to confirm the instance is ready before proceeding
 
-### 2. Run E2E Tests with Playwright MCP
+## Step 2: Run E2E Tests with Playwright MCP
 
-Use the **Playwright MCP browser tools** (not raw Node.js scripts) for step-by-step browser testing:
+Use the **Playwright MCP browser tools** to test the instance from Step 1:
 
-1. Navigate to the test instance URL with `browser_navigate`
-2. Use `browser_snapshot` to inspect page state (preferred over screenshots)
-3. Interact with elements using `browser_click`, `browser_type`, `browser_fill_form`
-4. Assert conditions by inspecting snapshots
+1. Navigate to the test instance URL (from Step 1 output) with `browser_navigate`
+2. Log in with `test` / `test`
+3. Use `browser_snapshot` to inspect page state (preferred over screenshots)
+4. Interact with elements using `browser_click`, `browser_type`, `browser_fill_form`
+5. Assert conditions by inspecting snapshots
 
-**Important notes:**
-- The test instance has no `project-repos.json`, so the New Session dialog shows raw URL + branch inputs instead of the repository dropdown. Fill the URL and branch fields manually.
-- `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers` is already set in the environment
-- Playwright is installed globally — `import('playwright')` works if you need programmatic access
+**Tips:**
+- The test instance has no `project-repos.json`, so the New Session dialog shows raw URL + branch inputs instead of the repository dropdown
+- `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers` is already set
+- Test sessions can use `dangerous` permission mode to avoid approval dialog friction during E2E tests
 
-### 3. Clean Up
+## Step 3: Clean Up
 
-When testing is complete, always clean up the test instance:
+When testing is complete, always clean up:
 
 ```bash
 bash /workspace/scripts/cleanup-test-clawd.sh <container-name>
 ```
 
-This removes both the test master container and any session containers it spawned.
+## Step 4: Report Results
 
-### 4. Report Results
+Summarize which tests passed/failed, any errors encountered, and snapshots of failures.
 
-Summarize:
-- Which tests passed/failed
-- Any errors encountered
-- Screenshots or snapshots of failures
+## Test Recipes
 
-## Tips
+### Recipe: Verify Plan Markdown View
+1. Create a new session (any repo, `auto_edits` mode)
+2. Send: "Enter plan mode and write a short 3-bullet plan for adding a README"
+3. Wait for the plan card to appear in the chat
+4. Click the plan card to open the full-screen overlay
+5. Assert: overlay is visible, contains markdown content, has a close button
+6. Close the overlay and assert it's dismissed
 
-- If the test instance takes too long to start, check its logs: `docker logs <container-name>`
-- Test instances run on port 5000 within the Docker network — they're not exposed to the host
+### Recipe: Verify Session Creation
+1. Click "New Session" from the session list
+2. Fill in a repo URL (e.g. `https://github.com/octocat/Hello-World`), branch `master`, permission mode `normal`
+3. Submit the form
+4. Assert: session appears in the list, status transitions to "running"
+5. Send a simple message like "What files are in this repo?" and verify a response appears
+
+### Recipe: Verify Skill Invocation
+1. Create a new session (any repo, `auto_edits` mode)
+2. Type `/` in the input to trigger the skill picker
+3. Assert: skill options appear (e.g. "wrapup")
+4. Select a skill and verify it loads into the input
+
+## Troubleshooting
+
+- If the test instance takes too long to start, check logs: `docker logs <container-name>`
+- Test instances run on port 5000 within the Docker network — not exposed to the host
 - Each test instance gets a unique name based on timestamp, so multiple can coexist
-- The test instance uses `CLAWD_TEST_USER`/`CLAWD_TEST_PASSWORD` for simple auth (no OAuth needed for the test UI)
