@@ -16,6 +16,12 @@ export const config = {
   get ntfyTopic() { return process.env.NTFY_TOPIC || ''; },
   get ntfyServer() { return process.env.NTFY_SERVER || 'https://ntfy.sh'; },
 
+  // Instance identification (prevents cross-instance container conflicts)
+  instanceId: process.env.CLAWD_INSTANCE_ID || 'production',
+
+  // Hostname that session containers use to reach this master (on the Docker network)
+  masterHostname: process.env.CLAWD_MASTER_HOSTNAME || 'clawd',
+
   // Docker container management
   sessionImage: process.env.CLAWD_SESSION_IMAGE || 'clawd-session:latest',
   networkName: process.env.CLAWD_NETWORK || 'clawd-network',

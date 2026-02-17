@@ -13,6 +13,7 @@ export interface CreateSessionRequest {
   name: string;
   repoUrl: string;
   branch: string;
+  dockerAccess?: boolean;
 }
 
 export interface SessionListResponse {

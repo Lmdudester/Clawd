@@ -15,7 +15,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
 
   // Create a new session
   router.post('/', async (req: AuthRequest, res) => {
-    const { name, repoUrl, branch } = req.body as CreateSessionRequest;
+    const { name, repoUrl, branch, dockerAccess } = req.body as CreateSessionRequest;
 
     if (!name || !repoUrl || !branch) {
       const error: ErrorResponse = { error: 'Name, repoUrl, and branch are required' };
@@ -24,7 +24,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     }
 
     try {
-      const session = await sessionManager.createSession(name, repoUrl, branch);
+      const session = await sessionManager.createSession(name, repoUrl, branch, !!dockerAccess);
       res.status(201).json({ session });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Failed to create session' });

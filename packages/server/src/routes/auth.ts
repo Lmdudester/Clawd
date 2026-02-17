@@ -38,6 +38,15 @@ router.post('/login', loginLimiter, (req, res) => {
   }
 
   const credentials = loadCredentials();
+
+  // Allow env-based test credentials (for automated E2E testing)
+  if (process.env.CLAWD_TEST_USER && process.env.CLAWD_TEST_PASSWORD) {
+    credentials.users.push({
+      username: process.env.CLAWD_TEST_USER,
+      password: process.env.CLAWD_TEST_PASSWORD,
+    });
+  }
+
   const user = credentials.users.find(
     (u) => u.username === username && u.password === password
   );

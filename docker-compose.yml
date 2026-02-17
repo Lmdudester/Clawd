@@ -1,6 +1,7 @@
 services:
   clawd:
     build: .
+    image: clawd:latest
     container_name: clawd
     networks:
       - clawd-network
@@ -20,6 +21,7 @@ services:
       - CLAWD_NETWORK=clawd-network
       - CREDENTIALS_PATH=/app/credentials.json
       - PROJECT_REPOS_PATH=/app/project-repos.json
+      - GIT_BRANCH=self-testing
     env_file:
       - .env
     restart: unless-stopped

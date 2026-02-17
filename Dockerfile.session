@@ -27,6 +27,14 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get update && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
+# ── Docker CLI (for sessions that need container management) ──
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg \
+      | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bookworm stable" \
+      > /etc/apt/sources.list.d/docker.list \
+    && apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
+    && rm -rf /var/lib/apt/lists/*
+
 # ── pnpm via corepack (bundled with Node.js 22) ─────────────────
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -36,9 +44,9 @@ RUN npm install -g @anthropic-ai/claude-code
 
 # Install Playwright MCP server globally and Chromium + system deps
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
-RUN npm install -g @playwright/mcp \
+RUN npm install -g @playwright/mcp playwright \
     && npx --package=@playwright/mcp playwright install --with-deps chromium \
-    && chmod -R o+rwx /opt/playwright-browsers
+    && chmod -R a+rwx /opt/playwright-browsers
 
 # ── Build the session agent ──────────────────────────────────────
 WORKDIR /session-agent
@@ -64,7 +72,8 @@ COPY session-skills/ /home/node/.claude/skills/
 # ── Set up non-root user ─────────────────────────────────────────
 RUN mkdir -p /home/node/.claude /workspace \
     && echo '{"hasCompletedOnboarding":true}' > /home/node/.claude.json \
-    && chown -R node:node /home/node/.claude /home/node/.claude.json /workspace /session-agent
+    && chown -R node:node /home/node/.claude /home/node/.claude.json /workspace /session-agent \
+    && usermod -aG root node
 
 USER node
 ENV HOME=/home/node

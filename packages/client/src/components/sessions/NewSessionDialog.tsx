@@ -18,6 +18,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [isNewBranch, setIsNewBranch] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
+  const [dockerAccess, setDockerAccess] = useState(false);
 
   const addSession = useSessionStore((s) => s.addSession);
   const navigate = useNavigate();
@@ -100,7 +101,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
         });
       }
 
-      const res = await api.createSession({ name, repoUrl, branch: effectiveBranch });
+      const res = await api.createSession({ name, repoUrl, branch: effectiveBranch, dockerAccess });
       addSession(res.session);
       navigate(`/session/${res.session.id}`);
       onClose();
@@ -111,6 +112,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
       setSelectedRepo(null);
       setIsNewBranch(false);
       setNewBranchName('');
+      setDockerAccess(false);
     } catch (err: any) {
       setError(err.message || 'Failed to create session');
     } finally {
@@ -230,6 +232,19 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
               className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
             />
           )}
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={dockerAccess}
+              onChange={(e) => setDockerAccess(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+            />
+            <div>
+              <span className="text-sm text-white">Docker access</span>
+              <p className="text-xs text-slate-400">Mount Docker socket for container management</p>
+            </div>
+          </label>
 
           <div className="flex gap-3 pt-2">
             <button

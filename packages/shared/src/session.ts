@@ -16,6 +16,7 @@ export interface SessionInfo {
   name: string;
   repoUrl: string;
   branch: string;
+  dockerAccess: boolean;
   status: SessionStatus;
   createdAt: string;
   lastMessageAt: string | null;
