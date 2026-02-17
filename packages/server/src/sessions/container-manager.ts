@@ -85,6 +85,7 @@ export class ContainerManager {
       `PERMISSION_MODE=${cfg.permissionMode || 'normal'}`,
       `GIT_REPO_URL=${cfg.repoUrl}`,
       `GIT_BRANCH=${cfg.branch}`,
+      `ANTHROPIC_MODEL=opus`,
     ];
 
     if (cfg.githubToken) env.push(`GITHUB_TOKEN=${cfg.githubToken}`);
