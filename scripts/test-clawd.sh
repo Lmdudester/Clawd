@@ -64,6 +64,7 @@ docker run -d \
   -e "GIT_BRANCH=${BRANCH}" \
   -e "CLAWD_SESSION_IMAGE=clawd-session:latest" \
   -e "CLAWD_NETWORK=${NETWORK}" \
+  -e "CLAWD_MASTER_HOSTNAME=${INSTANCE_NAME}" \
   -e "GITHUB_TOKEN=${GITHUB_TOKEN:-}" \
   -e "GIT_USER_NAME=${GIT_USER_NAME:-}" \
   -e "GIT_USER_EMAIL=${GIT_USER_EMAIL:-}" \
