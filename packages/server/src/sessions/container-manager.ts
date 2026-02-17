@@ -15,6 +15,7 @@ export interface SessionContainerConfig {
   claudeDir: string;
   oauthToken?: string;
   permissionMode?: string;
+  dockerAccess?: boolean;
 }
 
 export class ContainerManager {
@@ -48,7 +49,10 @@ export class ContainerManager {
     try {
       const containers = await this.docker.listContainers({
         all: true,
-        filters: { label: ['clawd.session=true'] },
+        filters: { label: [
+          'clawd.session=true',
+          `clawd.instance.id=${config.instanceId}`,
+        ] },
       });
 
       for (const container of containers) {
@@ -70,7 +74,7 @@ export class ContainerManager {
   }
 
   async createSessionContainer(cfg: SessionContainerConfig): Promise<string> {
-    const containerName = `clawd-session-${cfg.sessionId}`;
+    const containerName = `clawd-session-${config.instanceId}-${cfg.sessionId}`;
     console.log(`[containers] Creating container: ${containerName}`);
 
     // Build environment variables
@@ -95,6 +99,12 @@ export class ContainerManager {
       binds.push(`${cfg.claudeDir}/.credentials.json:/home/node/.claude/.credentials.json:ro`);
     }
 
+    // Mount Docker socket for sessions that need container management
+    if (cfg.dockerAccess) {
+      binds.push('/var/run/docker.sock:/var/run/docker.sock');
+      env.push('DOCKER_HOST=unix:///var/run/docker.sock');
+    }
+
     const container = await this.docker.createContainer({
       Image: config.sessionImage,
       name: containerName,
@@ -102,6 +112,7 @@ export class ContainerManager {
       Labels: {
         'clawd.session': 'true',
         'clawd.session.id': cfg.sessionId,
+        'clawd.instance.id': config.instanceId,
       },
       HostConfig: {
         Binds: binds.length > 0 ? binds : undefined,
@@ -120,6 +131,9 @@ export class ContainerManager {
   }
 
   async stopAndRemove(sessionId: string): Promise<void> {
+    // Clean up any test Clawd instances spawned by this session
+    await this.cleanupTestInstances(sessionId);
+
     const containerId = this.containers.get(sessionId);
     if (!containerId) return;
 
@@ -137,6 +151,32 @@ export class ContainerManager {
     }
 
     this.containers.delete(sessionId);
+  }
+
+  /** Remove test Clawd master containers spawned by a given session. */
+  private async cleanupTestInstances(ownerSessionId: string): Promise<void> {
+    try {
+      const containers = await this.docker.listContainers({
+        all: true,
+        filters: { label: [`clawd.test-instance.owner=${ownerSessionId}`] },
+      });
+
+      for (const info of containers) {
+        const c = this.docker.getContainer(info.Id);
+        try {
+          if (info.State === 'running') {
+            console.log(`[containers] Stopping test instance: ${info.Names?.[0]}`);
+            await c.stop({ t: 5 });
+          }
+          await c.remove({ force: true });
+          console.log(`[containers] Removed test instance: ${info.Names?.[0]}`);
+        } catch (err: any) {
+          console.warn(`[containers] Failed to cleanup test instance: ${err.message}`);
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[containers] Failed to list test instances for session ${ownerSessionId}: ${err.message}`);
+    }
   }
 
   async getStatus(sessionId: string): Promise<'running' | 'stopped' | 'not_found'> {

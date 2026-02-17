@@ -57,7 +57,7 @@ export class SessionManager {
     return this.sessions.get(sessionId)?.messages ?? [];
   }
 
-  async createSession(name: string, repoUrl: string, branch: string): Promise<SessionInfo> {
+  async createSession(name: string, repoUrl: string, branch: string, dockerAccess = false): Promise<SessionInfo> {
     const id = uuid();
     const sessionToken = v4();
 
@@ -66,6 +66,7 @@ export class SessionManager {
       name,
       repoUrl,
       branch,
+      dockerAccess,
       status: 'starting',
       createdAt: new Date().toISOString(),
       lastMessageAt: null,
@@ -131,6 +132,7 @@ export class SessionManager {
       claudeDir: claudeDir || '',
       oauthToken,
       permissionMode: session.info.permissionMode,
+      dockerAccess: session.info.dockerAccess,
     };
 
     const containerId = await this.containerManager.createSessionContainer(containerConfig);

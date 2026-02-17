@@ -1,6 +1,7 @@
 services:
   clawd:
     build: .
+    image: clawd:latest
     container_name: clawd
     networks:
       - clawd-network
