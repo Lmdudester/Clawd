@@ -57,7 +57,7 @@ export interface PendingQuestion {
 }
 
 export interface ContextUsage {
-  // Cumulative session totals
+  // Cumulative session totals (for cost tracking)
   cumulativeInputTokens: number;
   cumulativeOutputTokens: number;
   cumulativeCacheReadTokens: number;
@@ -69,12 +69,7 @@ export interface ContextUsage {
   lastTurnCacheReadTokens: number;
   lastTurnCacheCreationTokens: number;
 
-  // Context window tracking
-  contextWindow: number;
-  estimatedContextUsed: number;  // Our best estimate of actual context consumed
-  isEstimated: boolean;          // True if estimatedContextUsed is approximate
-
-  // Existing fields
+  // Session metadata
   maxOutputTokens: number;
   totalCostUsd: number;
   numTurns: number;
