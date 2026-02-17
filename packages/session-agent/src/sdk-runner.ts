@@ -321,9 +321,9 @@ export class SDKRunner {
         preset: 'claude_code',
         append: [
           'You are running inside a Clawd session container.',
-          'Be efficient with tokens — avoid unnecessary codebase exploration.',
-          'When a skill provides step-by-step instructions, follow them directly without exploring first.',
-          'If you need project context, check CLAUDE.md before reading individual source files.',
+          'IMPORTANT: Do not explore or read source files unless the task specifically requires understanding the code.',
+          'This project\'s CLAUDE.md already gives you the architecture and key paths — trust it instead of reading files to orient yourself.',
+          'When a skill provides step-by-step instructions, follow them immediately without any preliminary exploration.',
         ].join(' '),
       };
 

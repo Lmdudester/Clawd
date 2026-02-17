@@ -2,6 +2,10 @@
 
 Clawd is a self-hosted web UI for Claude Code sessions, running each session in an isolated Docker container with the Claude Agent SDK.
 
+## Session Efficiency
+
+You already have all the context you need from this file. Do not read source files, package.json, or directory listings to orient yourself — only read files that are directly relevant to your current task. If a skill gives you step-by-step instructions, start at step 1 immediately.
+
 ## Architecture
 
 ```
