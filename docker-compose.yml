@@ -21,7 +21,7 @@ services:
       - CLAWD_NETWORK=clawd-network
       - CREDENTIALS_PATH=/app/credentials.json
       - PROJECT_REPOS_PATH=/app/project-repos.json
-      - GIT_BRANCH=self-testing
+      - GIT_BRANCH=main
     env_file:
       - .env
     restart: unless-stopped
