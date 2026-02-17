@@ -152,18 +152,20 @@ export class CredentialStore {
     };
   }
 
-  // Get the raw OAuth access token from the credentials file.
+  // Get the raw OAuth access token from the credentials file, or env var fallback.
   getAccessToken(): string | null {
-    if (!this.storedAuth) return null;
-
-    try {
-      const credFile = join(this.storedAuth.claudeDir, '.credentials.json');
-      const raw = readFileSync(credFile, 'utf-8');
-      const creds = JSON.parse(raw);
-      return creds.claudeAiOauth?.accessToken || creds.accessToken || null;
-    } catch {
-      return null;
+    if (this.storedAuth) {
+      try {
+        const credFile = join(this.storedAuth.claudeDir, '.credentials.json');
+        const raw = readFileSync(credFile, 'utf-8');
+        const creds = JSON.parse(raw);
+        return creds.claudeAiOauth?.accessToken || creds.accessToken || null;
+      } catch {
+        return null;
+      }
     }
+
+    return process.env.CLAUDE_CODE_OAUTH_TOKEN || null;
   }
 
   // Get the currently selected .claude directory path (for container volume mounts).
