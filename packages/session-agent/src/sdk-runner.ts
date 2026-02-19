@@ -39,12 +39,25 @@ const READONLY_BASH_PATTERNS = [
   /^tail\b/,
 ];
 
-function isReadOnlyBash(toolName: string, input: Record<string, unknown>): boolean {
+export function isReadOnlyBash(toolName: string, input: Record<string, unknown>): boolean {
   if (toolName !== 'Bash') return false;
   const cmd = (typeof input.command === 'string' ? input.command : '').trim();
   // Reject gh api with --method that isn't GET
   if (/^gh\s+api\s/.test(cmd) && /--method\s+(?!GET\b)/i.test(cmd)) return false;
   return READONLY_BASH_PATTERNS.some(p => p.test(cmd));
+}
+
+export function getEditFilePath(toolName: string, input: Record<string, unknown>): string | null {
+  switch (toolName) {
+    case 'Edit':
+    case 'Write':
+    case 'Read':
+      return (input.file_path as string) || null;
+    case 'NotebookEdit':
+      return (input.notebook_path as string) || null;
+    default:
+      return null;
+  }
 }
 
 interface SDKRunnerOptions {
@@ -273,17 +286,8 @@ export class SDKRunner {
     }
   }
 
-  private getEditFilePath(toolName: string, input: Record<string, unknown>): string | null {
-    switch (toolName) {
-      case 'Edit':
-      case 'Write':
-      case 'Read':
-        return (input.file_path as string) || null;
-      case 'NotebookEdit':
-        return (input.notebook_path as string) || null;
-      default:
-        return null;
-    }
+  private getEditFilePathForApproval(toolName: string, input: Record<string, unknown>): string | null {
+    return getEditFilePath(toolName, input);
   }
 
   async run(): Promise<void> {
@@ -350,7 +354,7 @@ export class SDKRunner {
             }
             // Auto-edits: approve file mutations within CWD
             if (this.permissionMode === 'auto_edits') {
-              const filePath = this.getEditFilePath(toolName, input);
+              const filePath = this.getEditFilePathForApproval(toolName, input);
               const normalizedFile = filePath?.replace(/\\/g, '/');
               const normalizedCwd = this.cwd.replace(/\\/g, '/');
               if (normalizedFile && normalizedFile.startsWith(normalizedCwd + '/')) {

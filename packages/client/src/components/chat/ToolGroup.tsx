@@ -12,7 +12,7 @@ interface ToolPair {
   result?: SessionMessage;
 }
 
-function pairToolMessages(messages: SessionMessage[]): (ToolPair | SessionMessage)[] {
+export function pairToolMessages(messages: SessionMessage[]): (ToolPair | SessionMessage)[] {
   const pairs: (ToolPair | SessionMessage)[] = [];
   let i = 0;
   while (i < messages.length) {

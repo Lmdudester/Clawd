@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../auth/middleware.js';
 import type { CreateBranchRequest, ErrorResponse } from '@clawd/shared';
 
-function parseOwnerRepo(repoUrl: string): { owner: string; repo: string } | null {
+export function parseOwnerRepo(repoUrl: string): { owner: string; repo: string } | null {
   // Handles https://github.com/owner/repo, https://github.com/owner/repo.git, etc.
   const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
   if (!match) return null;
