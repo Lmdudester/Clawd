@@ -66,12 +66,14 @@ export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt }:
         disabled={disabled}
         rows={1}
         className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none text-base"
+        data-testid="message-input"
       />
       {isInterruptible && (
         <button
           onClick={onInterrupt}
           className="px-4 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl font-medium transition-colors shrink-0 flex items-center gap-1.5"
           title="Stop generation (Esc)"
+          data-testid="stop-button"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
             <rect x="3" y="3" width="10" height="10" rx="1" />
@@ -83,6 +85,7 @@ export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt }:
         onClick={handleSubmit}
         disabled={disabled || !value.trim()}
         className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl font-medium transition-colors shrink-0"
+        data-testid="send-button"
       >
         Send
       </button>

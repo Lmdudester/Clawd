@@ -78,15 +78,14 @@ export function PlanCard({ toolCall, result, fullContent, defaultCollapsed }: Pr
         </div>
       </div>
 
-      {/* Full-screen overlay (portaled to body to avoid scroll container issues on mobile) */}
+      {/* Full-screen overlay (portaled to #root to stay inside React's event delegation tree) */}
       {overlayOpen && createPortal(
         <div
           className="fixed inset-0 z-50 bg-black/60"
-          onClick={() => setOverlayOpen(false)}
+          onClick={(e) => { if (e.target === e.currentTarget) setOverlayOpen(false); }}
         >
           <div
             className="h-full bg-slate-900 flex flex-col"
-            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-700 shrink-0">
@@ -113,7 +112,7 @@ export function PlanCard({ toolCall, result, fullContent, defaultCollapsed }: Pr
             </div>
           </div>
         </div>,
-        document.body
+        document.getElementById('root')!
       )}
     </>
   );

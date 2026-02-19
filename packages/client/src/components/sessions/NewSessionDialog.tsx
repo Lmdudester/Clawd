@@ -121,10 +121,9 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
         className="w-full max-w-md bg-slate-800 rounded-t-2xl sm:rounded-2xl border border-slate-700 p-6"
-        onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold text-white mb-4">New Session</h2>
 
@@ -251,6 +250,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
               type="button"
               onClick={onClose}
               className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+              data-testid="cancel-session-button"
             >
               Cancel
             </button>
@@ -258,6 +258,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
               type="submit"
               disabled={loading || !name || !repoUrl || !effectiveBranch}
               className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors"
+              data-testid="create-session-button"
             >
               {loading ? 'Creating...' : 'Create'}
             </button>

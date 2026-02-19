@@ -38,10 +38,9 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onCha
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
         className="w-full max-w-md bg-slate-800 rounded-t-2xl sm:rounded-2xl border border-slate-700 p-6"
-        onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold text-white mb-5">Session Settings</h2>
 
@@ -144,6 +143,7 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onCha
         <button
           onClick={onClose}
           className="w-full mt-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+          data-testid="settings-close-button"
         >
           Close
         </button>

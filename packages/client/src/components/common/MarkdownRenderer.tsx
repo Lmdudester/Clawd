@@ -19,7 +19,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
               </code>
             );
           }
-          return <CodeBlock language={match![1]}>{String(children).replace(/\n$/, '')}</CodeBlock>;
+          return <CodeBlock language={match![1]} className={className}>{children}</CodeBlock>;
         },
         p({ children }) {
           return <p className="mb-2 last:mb-0">{children}</p>;

@@ -1,5 +1,13 @@
 // Tool-specific configuration, summaries, and formatting utilities
 
+/** Safely convert any tool input value to a displayable string. */
+export function str(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && 'text' in (value as any)) return String((value as any).text);
+  return String(value);
+}
+
 export interface ToolConfig {
   label: string;
   borderClass: string;
@@ -103,6 +111,11 @@ export function getToolSummary(
       return '';
     }
   }
+}
+
+export function isUnifiedDiff(content: string): boolean {
+  return /^@@\s+-\d+/m.test(content) &&
+         (/^diff --git /m.test(content) || /^--- /m.test(content));
 }
 
 export function isErrorResult(content: string): boolean {

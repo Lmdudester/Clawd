@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { SessionMessage } from '@clawd/shared';
-import { isErrorResult } from '../../lib/toolFormatters';
+import { isErrorResult, isUnifiedDiff } from '../../lib/toolFormatters';
+import { DiffRenderer } from '../common/DiffRenderer';
 
 /**
  * Standalone fallback for orphaned tool_result messages that aren't paired with a tool_call.
@@ -41,10 +42,14 @@ export function ToolResultCard({ message }: { message: SessionMessage }) {
           </svg>
         </button>
         {expanded && (
-          <div className="border-t border-slate-700/30 px-3 py-2">
-            <pre className="text-sm font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap max-h-60 overflow-y-auto">
-              {message.content}
-            </pre>
+          <div className="border-t border-slate-700/30 px-3 py-2 max-h-60 overflow-y-auto">
+            {!hasError && isUnifiedDiff(message.content) ? (
+              <DiffRenderer diff={message.content} />
+            ) : (
+              <pre className="text-sm font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap">
+                {message.content}
+              </pre>
+            )}
           </div>
         )}
       </div>
