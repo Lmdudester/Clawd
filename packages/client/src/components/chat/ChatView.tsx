@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSessionStore } from '../../stores/sessionStore';
 import type { SessionMessage, SessionSettingsUpdate } from '@clawd/shared';
@@ -22,7 +22,6 @@ export function ChatView() {
   const sessions = useSessionStore((s) => s.sessions);
   const session = sessions.find((s) => s.id === id);
   const messages = useSessionStore((s) => s.messages.get(id ?? '')) ?? EMPTY_MESSAGES;
-  const streamingTokens = useSessionStore((s) => s.streamingTokens);
   const pendingApproval = useSessionStore((s) => s.pendingApproval);
   const pendingQuestion = useSessionStore((s) => s.pendingQuestion);
   const setCurrentSession = useSessionStore((s) => s.setCurrentSession);
@@ -31,19 +30,33 @@ export function ChatView() {
   const setPendingApproval = useSessionStore((s) => s.setPendingApproval);
   const setPendingQuestion = useSessionStore((s) => s.setPendingQuestion);
 
+  const [sessionNotFound, setSessionNotFound] = useState(false);
+
   // Subscribe to session on mount
   useEffect(() => {
     if (!id) return;
     setCurrentSession(id);
     send({ type: 'subscribe', sessionId: id });
 
-    // Load session details
+    // Load session details via REST as a reliable fallback (the WebSocket
+    // subscribe may be dropped if the connection isn't ready yet)
     api.getSession(id).then((res) => {
       updateSession(res.session);
       setMessages(id, res.messages);
-    }).catch(() => {});
+    }).catch((err) => {
+      if (err.message === 'Session not found') {
+        setSessionNotFound(true);
+      }
+    });
+
+    // Retry subscribe after a short delay to handle the case where the
+    // WebSocket wasn't connected when the first subscribe was sent
+    const retryTimer = setTimeout(() => {
+      send({ type: 'subscribe', sessionId: id });
+    }, 1500);
 
     return () => {
+      clearTimeout(retryTimer);
       send({ type: 'unsubscribe', sessionId: id });
       setCurrentSession(null);
     };
@@ -90,12 +103,32 @@ export function ChatView() {
     send({ type: 'get_models', sessionId: id });
   }, [id, send]);
 
-  // Collect streaming text for this session
-  const streamingKey = Array.from(streamingTokens.keys()).find((k) => k.startsWith(`${id}:`));
-  const streamingText = streamingKey ? streamingTokens.get(streamingKey) ?? '' : '';
+  // Collect streaming text for this session — use a narrow selector to avoid
+  // re-rendering the entire ChatView on every streaming token for other sessions
+  const streamingText = useSessionStore((s) => {
+    for (const [key, value] of s.streamingTokens) {
+      if (key.startsWith(`${id}:`)) return value;
+    }
+    return '';
+  });
 
   const isInputDisabled = session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer' || session?.status === 'terminated' || session?.status === 'starting';
   const isInterruptible = session?.status === 'running' || session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer';
+
+  if (sessionNotFound) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-slate-950 p-4">
+        <h1 className="text-xl font-bold text-red-400 mb-2">Session not found</h1>
+        <p className="text-slate-400 mb-6">This session does not exist or has been deleted.</p>
+        <button
+          onClick={() => navigate('/')}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+        >
+          Back to Sessions
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-slate-950">

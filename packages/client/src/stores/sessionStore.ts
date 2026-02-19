@@ -37,14 +37,27 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setSessions: (sessions) => set({ sessions }),
 
   updateSession: (session) =>
-    set((state) => ({
-      sessions: state.sessions.map((s) => (s.id === session.id ? session : s)),
-    })),
+    set((state) => {
+      const exists = state.sessions.some((s) => s.id === session.id);
+      return {
+        sessions: exists
+          ? state.sessions.map((s) => (s.id === session.id ? session : s))
+          : [...state.sessions, session],
+      };
+    }),
 
   addSession: (session) =>
-    set((state) => ({
-      sessions: [...state.sessions, session],
-    })),
+    set((state) => {
+      // Prevent duplicates — if the session already exists (e.g. from a
+      // broadcastAll session_update that arrived before this call), update
+      // it instead of appending a second entry.
+      const exists = state.sessions.some((s) => s.id === session.id);
+      return {
+        sessions: exists
+          ? state.sessions.map((s) => (s.id === session.id ? session : s))
+          : [...state.sessions, session],
+      };
+    }),
 
   removeSession: (id) =>
     set((state) => ({

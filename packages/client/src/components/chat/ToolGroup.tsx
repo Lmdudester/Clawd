@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import type { SessionMessage } from '@clawd/shared';
 import { ToolCallCard } from './ToolCallCard';
 import { ToolResultCard } from './ToolResultCard';
@@ -37,7 +37,7 @@ function pairToolMessages(messages: SessionMessage[]): (ToolPair | SessionMessag
   return pairs;
 }
 
-export function ToolGroup({ messages }: Props) {
+export const ToolGroup = memo(function ToolGroup({ messages }: Props) {
   const pairs = useMemo(() => pairToolMessages(messages), [messages]);
 
   return (
@@ -57,4 +57,4 @@ export function ToolGroup({ messages }: Props) {
       })}
     </div>
   );
-}
+});

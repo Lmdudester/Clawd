@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import type { SessionMessage } from '@clawd/shared';
 import { getToolConfig, getToolSummary, isErrorResult, isUnifiedDiff, getLanguageFromPath, str } from '../../lib/toolFormatters';
 import { ToolIcon } from './ToolIcon';
@@ -9,7 +9,7 @@ interface Props {
   result?: SessionMessage;
 }
 
-export function ToolCallCard({ message, result }: Props) {
+export const ToolCallCard = memo(function ToolCallCard({ message, result }: Props) {
   const [expanded, setExpanded] = useState(false);
   const config = getToolConfig(message.toolName);
   const summary = getToolSummary(message.toolName, message.toolInput);
@@ -65,7 +65,7 @@ export function ToolCallCard({ message, result }: Props) {
       </div>
     </div>
   );
-}
+});
 
 // --- Tool-specific detail rendering ---
 

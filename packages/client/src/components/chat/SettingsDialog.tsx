@@ -21,10 +21,15 @@ const PERMISSION_MODES: { value: PermissionMode; label: string; description: str
 
 export function SettingsDialog({ open, onClose, session, onUpdateSettings, onChangeModel, availableModels, onRequestModels }: SettingsDialogProps) {
   const [name, setName] = useState(session.name);
+  const [modelsTimedOut, setModelsTimedOut] = useState(false);
   useEffect(() => {
     if (open) {
       setName(session.name);
+      setModelsTimedOut(false);
       onRequestModels();
+      // If models haven't loaded after 5s, stop showing loading state
+      const timer = setTimeout(() => setModelsTimedOut(true), 5000);
+      return () => clearTimeout(timer);
     }
   }, [open, session.name, onRequestModels]);
 
@@ -96,7 +101,11 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onCha
                 </select>
               ) : (
                 <div className="px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-400 text-sm">
-                  {session.model ?? 'Loading models...'}
+                  {session.model
+                    ? session.model
+                    : modelsTimedOut
+                      ? 'Unable to load models'
+                      : 'Loading models...'}
                 </div>
               );
             })()}
