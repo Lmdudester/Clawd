@@ -16,7 +16,7 @@ A web-based remote interface for [Claude Code](https://docs.anthropic.com/en/doc
   - *Plan* — Deny all tool calls, forcing Claude to describe rather than execute
 - **Model switching** — Switch between available Claude models mid-session
 - **API usage monitoring** — Real-time Anthropic API rate limit display with color-coded progress bars
-- **OAuth authentication** — Use OAuth credentials from an existing Claude CLI installation (Claude Max)
+- **OAuth authentication** — Use OAuth credentials from an existing Claude CLI installation (Claude Max) with automatic token refresh
 - **Project repo bookmarks** — Save frequently-used repositories for quick session creation
 - **Push notifications** — Optional [ntfy.sh](https://ntfy.sh) integration sends mobile/desktop alerts when a session needs approval, asks a question, or finishes a task (only fires when no one is actively viewing the session)
 - **PWA support** — Install as a Progressive Web App for an app-like experience on mobile
