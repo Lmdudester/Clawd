@@ -77,8 +77,24 @@ function UnifiedBar({ label, bucket }: { label: string; bucket: UnifiedBucket })
 export function UsageCard() {
   const { usage, loading, error, refresh } = useUsage();
 
-  if (error) return null;
   if (!loading && usage?.authMethod === 'none') return null;
+
+  if (error) {
+    return (
+      <div className="p-4 bg-slate-900/80 border border-red-800/50 rounded-xl">
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-red-400">{error}</div>
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className="ml-3 px-3 py-1 text-xs rounded border border-red-500/50 text-red-400 hover:text-red-300 hover:border-red-300/50 transition-colors disabled:opacity-50 shrink-0"
+          >
+            {loading ? 'Retrying...' : 'Retry'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const hasUnified = usage?.unified5h || usage?.unified7d;
   const hasStandard = usage?.tokens || usage?.inputTokens || usage?.outputTokens || usage?.requests;

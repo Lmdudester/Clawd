@@ -59,7 +59,7 @@ export function createUsageRoutes(credentialStore: CredentialStore): Router {
     // Ensure we have a fresh token (auto-refreshes if expired)
     let token = await credentialStore.ensureFreshToken();
     if (!token) {
-      res.status(401).json({ error: 'OAuth token expired and refresh failed. Please re-authenticate via Claude CLI.' });
+      res.status(502).json({ error: 'OAuth token expired and refresh failed. Please re-authenticate via Claude CLI.' });
       return;
     }
 
@@ -91,7 +91,7 @@ export function createUsageRoutes(credentialStore: CredentialStore): Router {
           apiRes = await makeApiRequest(newToken);
         }
         if (apiRes.status === 401) {
-          res.status(401).json({ error: 'OAuth token expired and refresh failed. Please re-authenticate via Claude CLI.' });
+          res.status(502).json({ error: 'OAuth token expired and refresh failed. Please re-authenticate via Claude CLI.' });
           return;
         }
       }

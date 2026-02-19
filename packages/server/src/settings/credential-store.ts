@@ -18,6 +18,9 @@ interface ClaudeCredentials {
   accessToken?: string;
 }
 
+// Claude Code CLI OAuth client ID (public)
+const OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+
 // Refresh 5 minutes before expiry
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 // Minimum interval between refresh attempts
@@ -256,6 +259,7 @@ export class CredentialStore {
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token: refreshToken,
+          client_id: OAUTH_CLIENT_ID,
         }).toString(),
       });
 
@@ -324,7 +328,17 @@ export class CredentialStore {
     this.refreshTimer = setInterval(() => {
       if (this.storedAuth && this.isTokenExpired()) {
         console.log('[credentials] Proactive refresh: token is expired or expiring soon');
-        this.refreshToken().catch((err) => {
+        this.refreshToken().then((token) => {
+          if (!token) {
+            // Refresh failed — schedule a retry right after the cooldown expires
+            console.warn('[credentials] Proactive refresh failed, retrying after cooldown...');
+            setTimeout(() => {
+              this.refreshToken().catch((err) => {
+                console.error('[credentials] Proactive refresh retry failed:', err);
+              });
+            }, REFRESH_COOLDOWN_MS);
+          }
+        }).catch((err) => {
           console.error('[credentials] Proactive refresh failed:', err);
         });
       }
