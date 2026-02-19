@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../lib/api';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +9,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
   const [repoUrl, setRepoUrl] = useState('');
   const [branch, setBranch] = useState('');
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState('');
   const [repos, setRepos] = useState<ProjectRepo[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<number | null>(null);
@@ -86,6 +87,8 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setLoading(true);
     try {
@@ -117,6 +120,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
       setError(err.message || 'Failed to create session');
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 

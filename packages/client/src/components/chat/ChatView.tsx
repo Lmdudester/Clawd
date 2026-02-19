@@ -205,6 +205,7 @@ export function ChatView() {
           onClose={() => setSettingsOpen(false)}
           session={session}
           onUpdateSettings={handleUpdateSettings}
+          onUpdateSessionOptimistic={updateSession}
           onChangeModel={handleChangeModel}
           availableModels={availableModels}
           onRequestModels={handleRequestModels}

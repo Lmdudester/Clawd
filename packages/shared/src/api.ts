@@ -82,6 +82,17 @@ export interface CreateBranchResponse {
   branch: string;
 }
 
+// Skills API types
+
+export interface SkillInfo {
+  name: string;
+  description: string;
+}
+
+export interface SkillsResponse {
+  skills: SkillInfo[];
+}
+
 // Usage / Rate Limit types
 
 // Standard API tier bucket (requests, tokens, input-tokens, output-tokens)

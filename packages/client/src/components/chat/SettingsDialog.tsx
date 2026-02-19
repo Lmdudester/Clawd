@@ -7,6 +7,7 @@ interface SettingsDialogProps {
   onClose: () => void;
   session: SessionInfo;
   onUpdateSettings: (settings: { name?: string; permissionMode?: PermissionMode; notificationsEnabled?: boolean }) => void;
+  onUpdateSessionOptimistic: (session: SessionInfo) => void;
   onChangeModel: (model: string) => void;
   availableModels: ModelInfo[];
   onRequestModels: () => void;
@@ -19,7 +20,7 @@ const PERMISSION_MODES: { value: PermissionMode; label: string; description: str
   { value: 'dangerous', label: 'Dangerous', description: 'Auto-approve all tools' },
 ];
 
-export function SettingsDialog({ open, onClose, session, onUpdateSettings, onChangeModel, availableModels, onRequestModels }: SettingsDialogProps) {
+export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpdateSessionOptimistic, onChangeModel, availableModels, onRequestModels }: SettingsDialogProps) {
   const [name, setName] = useState(session.name);
   const [modelsTimedOut, setModelsTimedOut] = useState(false);
   useEffect(() => {
@@ -56,7 +57,10 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onCha
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                onUpdateSessionOptimistic({ ...session, name: e.target.value });
+              }}
               onBlur={handleNameCommit}
               onKeyDown={(e) => { if (e.key === 'Enter') handleNameCommit(); }}
               className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"

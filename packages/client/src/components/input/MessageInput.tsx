@@ -1,4 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { api } from '../../lib/api';
+import { SkillPicker } from './SkillPicker';
+import type { SkillInfo } from '@clawd/shared';
 
 interface Props {
   onSend: (content: string) => void;
@@ -10,12 +13,23 @@ interface Props {
 export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt }: Props) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [showSkillPicker, setShowSkillPicker] = useState(false);
+  const skillsFetchedRef = useRef(false);
+
+  // Fetch skills once on mount
+  useEffect(() => {
+    if (skillsFetchedRef.current) return;
+    skillsFetchedRef.current = true;
+    api.getSkills().then((res) => setSkills(res.skills)).catch(() => {});
+  }, []);
 
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setValue('');
+    setShowSkillPicker(false);
     // Reset textarea height
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
@@ -23,10 +37,21 @@ export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt }:
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape' && isInterruptible) {
-      e.preventDefault();
-      onInterrupt?.();
-      return;
+    // Let the SkillPicker handle arrow keys and Enter when open
+    if (showSkillPicker && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter')) {
+      return; // SkillPicker's global handler will process these
+    }
+    if (e.key === 'Escape') {
+      if (showSkillPicker) {
+        e.preventDefault();
+        setShowSkillPicker(false);
+        return;
+      }
+      if (isInterruptible) {
+        e.preventDefault();
+        onInterrupt?.();
+        return;
+      }
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -54,12 +79,51 @@ export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt }:
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setValue(newValue);
+
+    // Show skill picker when the input starts with '/' and has no spaces yet
+    if (newValue.startsWith('/') && !newValue.includes(' ') && skills.length > 0) {
+      setShowSkillPicker(true);
+    } else {
+      setShowSkillPicker(false);
+    }
+  };
+
+  const handleSkillSelect = useCallback((skill: SkillInfo) => {
+    const message = `/${skill.name}`;
+    setValue(message);
+    setShowSkillPicker(false);
+    // Auto-send the skill command
+    onSend(message);
+    setValue('');
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
+  }, [onSend]);
+
+  const handleSkillClose = useCallback(() => {
+    setShowSkillPicker(false);
+  }, []);
+
+  // Extract filter text (everything after '/')
+  const skillFilter = value.startsWith('/') ? value.slice(1) : '';
+
   return (
-    <div className="flex items-end gap-2 p-3 pb-5 bg-slate-900 border-t border-slate-800">
+    <div className="relative flex items-end gap-2 p-3 pb-5 bg-slate-900 border-t border-slate-800">
+      {showSkillPicker && (
+        <SkillPicker
+          skills={skills}
+          filter={skillFilter}
+          onSelect={handleSkillSelect}
+          onClose={handleSkillClose}
+        />
+      )}
       <textarea
         ref={inputRef}
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         onInput={handleInput}
         placeholder="Message Claude..."

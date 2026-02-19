@@ -15,6 +15,7 @@ import type {
   BranchesResponse,
   CreateBranchRequest,
   CreateBranchResponse,
+  SkillsResponse,
 } from '@clawd/shared';
 
 const BASE_URL = '/api';
@@ -106,5 +107,9 @@ export const api = {
   // Usage
   getUsage: () =>
     request<UsageResponse>('/usage'),
+
+  // Skills
+  getSkills: () =>
+    request<SkillsResponse>('/skills'),
 
 };
