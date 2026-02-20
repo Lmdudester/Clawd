@@ -107,7 +107,7 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 4. For each group of related issues:
    a. Create a new branch via the API: POST /api/repos/branches with a descriptive name like "fix/auth-improvements"
    b. Create a fix session on that branch
-   c. Instruct it to fix the specific issues (reference issue numbers), commit, and push when done
+   c. Instruct it to fix the specific issues (reference issue numbers), commit, and push when done. Do NOT instruct fix sessions to run tests, check for testing skills, or verify their changes — testing is handled separately in Step 3.
 5. Supervise ALL fix sessions using the approval polling loop until all are idle/complete
 6. Read each session's messages to verify work was done, then terminate each
 7. Repeat if any issues remain unaddressed
@@ -198,5 +198,5 @@ When supervising multiple sessions in parallel, poll each one in the same loop i
 11. When polling session status, if a session is in "error" or "terminated" state, read its messages to understand what went wrong and decide how to proceed
 12. Run child sessions in parallel when possible (multiple fix sessions, multiple test sessions) for efficiency
 13. Keep a mental log of which issues are addressed by which branches so you can properly close them after merge
-14. When creating exploration or test sessions, always instruct them to check the repo for available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, test scripts, CI configs, README) before starting work — repos may provide guidance on how to build, run, and test the project`;
+14. When creating exploration or test sessions (NOT fix sessions), always instruct them to check the repo for available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, test scripts, CI configs, README) before starting work — repos may provide guidance on how to build, run, and test the project. Fix sessions should only focus on making code changes, committing, and pushing — testing is handled in Step 3.`;
 }
