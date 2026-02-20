@@ -4,6 +4,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import type { SessionMessage, SessionSettingsUpdate } from '@clawd/shared';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { api } from '../../lib/api';
+import { getReconnectDelay } from '../../lib/reconnect';
 import { StatusBadge } from '../common/StatusBadge';
 import { MessageList } from './MessageList';
 import { MessageInput } from '../input/MessageInput';
@@ -49,11 +50,22 @@ export function ChatView() {
       }
     });
 
-    // Retry subscribe after a short delay to handle the case where the
-    // WebSocket wasn't connected when the first subscribe was sent
-    const retryTimer = setTimeout(() => {
-      send({ type: 'subscribe', sessionId: id });
-    }, 1500);
+    // Retry subscribe with exponential backoff in case the WebSocket
+    // wasn't connected when the first subscribe was sent
+    let retryAttempt = 0;
+    const maxRetries = 4;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const scheduleRetry = () => {
+      if (retryAttempt >= maxRetries) return;
+      const delay = getReconnectDelay(retryAttempt, 500, 8000);
+      retryAttempt++;
+      retryTimer = setTimeout(() => {
+        send({ type: 'subscribe', sessionId: id });
+        scheduleRetry();
+      }, delay);
+    };
+    scheduleRetry();
 
     return () => {
       clearTimeout(retryTimer);
