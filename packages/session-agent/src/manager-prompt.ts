@@ -138,10 +138,11 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
      -d '{"step": "merging"}'
    \`\`\`
    a. If tests pass: create a "merge" session on that branch, instruct it to:
-      - Run \`gh pr create --base main --head <branch> --title "..." --body "..."\` OR merge directly with git
+      - Switch to main with \`git checkout main && git pull\`
+      - Merge the fix branch with \`git merge <branch>\`
+      - Push main with \`git push\`
       - Close the related issues with \`gh issue close <number>\`
-      - Delete the branch after merge
-      - Push all changes
+      - Delete the branch locally and remotely with \`git branch -d <branch> && git push origin --delete <branch>\`
    b. If tests fail: create a new fix session to address the failures, then re-test
    c. Terminate each session when done
 4. Report idle between loops:
