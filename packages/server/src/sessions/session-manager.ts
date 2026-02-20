@@ -379,6 +379,10 @@ export class SessionManager {
 
     // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
     this.updateStatus(session, 'terminated');
+    // Explicitly close the agent WebSocket before nulling it so the close
+    // event fires while the session still has the correct terminated status,
+    // rather than relying on container teardown timing.
+    session.agentWs?.close();
     session.agentWs = null;
     await this.containerManager.stopAndRemove(sessionId);
   }
@@ -389,6 +393,10 @@ export class SessionManager {
 
     // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
     session.info.status = 'terminated';
+    // Explicitly close the agent WebSocket before nulling it so the close
+    // handler in internal-handler.ts sees the session as terminated.
+    session.agentWs?.close();
+    session.agentWs = null;
     await this.containerManager.stopAndRemove(sessionId);
     this.sessions.delete(sessionId);
   }
