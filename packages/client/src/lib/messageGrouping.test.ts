@@ -143,4 +143,65 @@ describe('groupMessages', () => {
     const segments = groupMessages(messages);
     expect(segments.map(s => s.kind)).toEqual(['tool_group', 'plan_write']);
   });
+
+  it('pairs tool_calls with results when multiple calls precede results (parallel tool use)', () => {
+    const messages = [
+      msg({ type: 'tool_call', toolName: 'Bash', toolInput: { command: 'ls' } }),
+      msg({ type: 'tool_call', toolName: 'Read', toolInput: { file_path: '/a.ts' } }),
+      msg({ type: 'tool_result', content: 'ls output' }),
+      msg({ type: 'tool_result', content: 'file content' }),
+    ];
+    const segments = groupMessages(messages);
+    expect(segments).toHaveLength(1);
+    expect(segments[0].kind).toBe('tool_group');
+    if (segments[0].kind === 'tool_group') {
+      expect(segments[0].messages).toHaveLength(4);
+    }
+  });
+
+  it('handles plan_write when results are batched after multiple calls', () => {
+    const messages = [
+      msg({
+        type: 'tool_call',
+        toolName: 'Write',
+        toolInput: { file_path: '/home/.claude/plans/p.md', content: 'plan' },
+      }),
+      msg({ type: 'tool_call', toolName: 'Bash', toolInput: { command: 'ls' } }),
+      msg({ type: 'tool_result', content: 'plan written' }),
+      msg({ type: 'tool_result', content: 'ls output' }),
+    ];
+    const segments = groupMessages(messages);
+    expect(segments.map(s => s.kind)).toEqual(['plan_write', 'tool_group']);
+    if (segments[0].kind === 'plan_write') {
+      expect(segments[0].result).toBeDefined();
+      expect(segments[0].result!.content).toBe('plan written');
+    }
+    if (segments[1].kind === 'tool_group') {
+      expect(segments[1].messages).toHaveLength(2);
+    }
+  });
+
+  it('handles tool_call without a matching result (streaming in progress)', () => {
+    const messages = [
+      msg({ type: 'tool_call', toolName: 'Bash', toolInput: { command: 'ls' } }),
+    ];
+    const segments = groupMessages(messages);
+    expect(segments).toHaveLength(1);
+    expect(segments[0].kind).toBe('tool_group');
+    if (segments[0].kind === 'tool_group') {
+      expect(segments[0].messages).toHaveLength(1);
+    }
+  });
+
+  it('handles orphaned tool_result without a preceding call', () => {
+    const messages = [
+      msg({ type: 'tool_result', content: 'orphaned result' }),
+    ];
+    const segments = groupMessages(messages);
+    expect(segments).toHaveLength(1);
+    expect(segments[0].kind).toBe('tool_group');
+    if (segments[0].kind === 'tool_group') {
+      expect(segments[0].messages).toHaveLength(1);
+    }
+  });
 });

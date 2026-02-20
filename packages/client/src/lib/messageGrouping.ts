@@ -27,22 +27,39 @@ export function groupMessages(messages: SessionMessage[]): Segment[] {
         i++;
       }
 
+      // Pair tool_calls with their tool_results. In practice, the SDK may
+      // emit several tool_calls before any results (parallel tool use), so
+      // we can't assume strict alternation. Pair each tool_call with the
+      // next *unmatched* tool_result that follows it in the group.
+      const pairedResults = new Set<number>();
+
+      function findResult(afterIdx: number): { result: SessionMessage; idx: number } | undefined {
+        for (let k = afterIdx + 1; k < group.length; k++) {
+          if (group[k].type === 'tool_result' && !pairedResults.has(k)) {
+            pairedResults.add(k);
+            return { result: group[k], idx: k };
+          }
+        }
+        return undefined;
+      }
+
       // Split into plan_write segments and remaining tool_group segments
       const nonPlan: SessionMessage[] = [];
       for (let j = 0; j < group.length; j++) {
         const m = group[j];
+
+        // Skip results that were already consumed by a tool_call pairing
+        if (pairedResults.has(j)) continue;
+
         if (isPlanFileWrite(m)) {
           // Flush any accumulated non-plan messages as a tool_group
           if (nonPlan.length > 0) {
             segments.push({ kind: 'tool_group', messages: [...nonPlan] });
             nonPlan.length = 0;
           }
-          // Check if the next message is the corresponding tool_result
-          let result: SessionMessage | undefined;
-          if (j + 1 < group.length && group[j + 1].type === 'tool_result') {
-            result = group[j + 1];
-            j++; // skip the result in the loop
-          }
+          // Find the next unmatched tool_result for this call
+          const paired = findResult(j);
+          const result = paired?.result;
 
           // Build full plan content by applying writes/edits
           const input = m.toolInput as Record<string, unknown> | undefined;
@@ -63,7 +80,15 @@ export function groupMessages(messages: SessionMessage[]): Segment[] {
           planContent.set(filePath, fullContent);
 
           segments.push({ kind: 'plan_write', toolCall: m, result, fullContent });
+        } else if (m.type === 'tool_call') {
+          // Non-plan tool_call: pair with its result
+          const paired = findResult(j);
+          nonPlan.push(m);
+          if (paired) {
+            nonPlan.push(paired.result);
+          }
         } else {
+          // Orphaned tool_result with no preceding call
           nonPlan.push(m);
         }
       }
