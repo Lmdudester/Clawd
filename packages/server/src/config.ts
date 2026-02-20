@@ -24,7 +24,10 @@ export const config = {
 
   // Docker container management
   sessionImage: process.env.CLAWD_SESSION_IMAGE || 'clawd-session:latest',
-  networkName: process.env.CLAWD_NETWORK || 'clawd-network',
+  // Include instanceId in the default network name to avoid collisions when
+  // multiple Clawd instances run on the same Docker host.
+  networkName: process.env.CLAWD_NETWORK ||
+    `clawd-network-${process.env.CLAWD_INSTANCE_ID || 'production'}`,
   sessionMemoryLimit: parseInt(process.env.SESSION_MEMORY_LIMIT || String(4 * 1024 * 1024 * 1024)), // 4GB
   sessionCpuShares: parseInt(process.env.SESSION_CPU_SHARES || '512'),
   sessionPidsLimit: parseInt(process.env.SESSION_PIDS_LIMIT || '256'),
