@@ -102,6 +102,7 @@ export class ContainerManager {
 
     // Mount Docker socket for sessions that need container management
     if (cfg.dockerAccess) {
+      console.warn(`[containers] WARNING: Creating session ${cfg.sessionId} with Docker socket access — container will have host Docker control`);
       binds.push('/var/run/docker.sock:/var/run/docker.sock');
       env.push('DOCKER_HOST=unix:///var/run/docker.sock');
     }
@@ -121,6 +122,10 @@ export class ContainerManager {
         CpuShares: config.sessionCpuShares,
         PidsLimit: config.sessionPidsLimit,
         NetworkMode: config.networkName,
+        ...(cfg.dockerAccess ? {
+          SecurityOpt: ['no-new-privileges:true'],
+          CapDrop: ['ALL'],
+        } : {}),
       },
     });
 

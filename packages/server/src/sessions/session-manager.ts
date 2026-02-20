@@ -23,6 +23,7 @@ interface ManagedSession {
   sessionToken: string;
   pendingApproval: PendingApproval | null;
   pendingQuestion: PendingQuestion | null;
+  cleanupPromise: Promise<void> | null;
 }
 
 type SessionEventHandler = (sessionId: string, event: string, data: unknown) => void;
@@ -105,6 +106,7 @@ export class SessionManager {
       sessionToken,
       pendingApproval: null,
       pendingQuestion: null,
+      cleanupPromise: null,
     };
 
     this.sessions.set(id, session);
@@ -391,28 +393,51 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
-    this.updateStatus(session, 'terminated');
-    // Explicitly close the agent WebSocket before nulling it so the close
-    // event fires while the session still has the correct terminated status,
-    // rather than relying on container teardown timing.
-    session.agentWs?.close();
-    session.agentWs = null;
-    await this.containerManager.stopAndRemove(sessionId);
+    // If cleanup is already in-flight, wait for it instead of starting another
+    if (session.cleanupPromise) {
+      await session.cleanupPromise;
+      return;
+    }
+
+    const cleanup = async () => {
+      // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
+      this.updateStatus(session, 'terminated');
+      // Explicitly close the agent WebSocket before nulling it so the close
+      // event fires while the session still has the correct terminated status,
+      // rather than relying on container teardown timing.
+      session.agentWs?.close();
+      session.agentWs = null;
+      await this.containerManager.stopAndRemove(sessionId);
+    };
+
+    session.cleanupPromise = cleanup();
+    await session.cleanupPromise;
   }
 
   async deleteSession(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
-    this.updateStatus(session, 'terminated');
-    // Explicitly close the agent WebSocket before nulling it so the close
-    // handler in internal-handler.ts sees the session as terminated.
-    session.agentWs?.close();
-    session.agentWs = null;
-    await this.containerManager.stopAndRemove(sessionId);
-    this.sessions.delete(sessionId);
+    // If cleanup is already in-flight, wait for it to finish first
+    if (session.cleanupPromise) {
+      await session.cleanupPromise;
+      // Session may have been deleted by a concurrent deleteSession call
+      if (!this.sessions.has(sessionId)) return;
+    }
+
+    const cleanup = async () => {
+      // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
+      this.updateStatus(session, 'terminated');
+      // Explicitly close the agent WebSocket before nulling it so the close
+      // handler in internal-handler.ts sees the session as terminated.
+      session.agentWs?.close();
+      session.agentWs = null;
+      await this.containerManager.stopAndRemove(sessionId);
+      this.sessions.delete(sessionId);
+    };
+
+    session.cleanupPromise = cleanup();
+    await session.cleanupPromise;
   }
 
   private updateStatus(session: ManagedSession, status: SessionStatus): void {
