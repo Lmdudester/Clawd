@@ -23,6 +23,16 @@ const PERMISSION_MODES: { value: PermissionMode; label: string; description: str
 export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpdateSessionOptimistic, onChangeModel, availableModels, onRequestModels }: SettingsDialogProps) {
   const [name, setName] = useState(session.name);
   const [modelsTimedOut, setModelsTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
   useEffect(() => {
     if (open) {
       setName(session.name);

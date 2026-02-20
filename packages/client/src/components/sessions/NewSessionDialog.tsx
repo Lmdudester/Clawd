@@ -24,6 +24,15 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
   const addSession = useSessionStore((s) => s.addSession);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
   const fetchBranches = useCallback((url: string, defaultBranch?: string) => {
     if (!url) return;
     setBranchesLoading(true);

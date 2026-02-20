@@ -42,16 +42,15 @@ describe('sessionStore', () => {
   });
 
   describe('updateSession', () => {
-    it('appends new session to list', () => {
+    it('does not add a session that is not already in the store', () => {
       const s = session({ id: 'new-1' });
       useSessionStore.getState().updateSession(s);
-      expect(useSessionStore.getState().sessions).toHaveLength(1);
-      expect(useSessionStore.getState().sessions[0].id).toBe('new-1');
+      expect(useSessionStore.getState().sessions).toHaveLength(0);
     });
 
     it('replaces existing session by ID', () => {
       const s = session({ id: 'existing', name: 'Original' });
-      useSessionStore.getState().updateSession(s);
+      useSessionStore.getState().addSession(s);
       useSessionStore.getState().updateSession(session({ id: 'existing', name: 'Updated' }));
 
       const sessions = useSessionStore.getState().sessions;
