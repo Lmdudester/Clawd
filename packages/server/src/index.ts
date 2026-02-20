@@ -87,6 +87,16 @@ containerManager.initialize().then(() => {
   console.warn('[containers] Session containers will not work until Docker is available');
 });
 
+// Graceful shutdown — clean up containers and network
+const shutdown = async () => {
+  console.log('\nShutting down...');
+  await containerManager.shutdown();
+  server.close();
+  process.exit(0);
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
 server.listen(config.port, config.host, () => {
   console.log(`\n  Clawd server running on http://${config.host}:${config.port}`);
 

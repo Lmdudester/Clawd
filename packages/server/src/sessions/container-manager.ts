@@ -180,6 +180,25 @@ export class ContainerManager {
     }
   }
 
+  async shutdown(): Promise<void> {
+    console.log('[containers] Shutting down container manager...');
+
+    // Stop and remove all tracked session containers
+    const sessionIds = Array.from(this.containers.keys());
+    for (const sessionId of sessionIds) {
+      await this.stopAndRemove(sessionId);
+    }
+
+    // Remove the Docker network
+    try {
+      const network = this.docker.getNetwork(config.networkName);
+      await network.remove();
+      console.log(`[containers] Removed network "${config.networkName}"`);
+    } catch (err: any) {
+      console.warn(`[containers] Failed to remove network "${config.networkName}": ${err.message}`);
+    }
+  }
+
   async getStatus(sessionId: string): Promise<'running' | 'stopped' | 'not_found'> {
     const containerId = this.containers.get(sessionId);
     if (!containerId) return 'not_found';
