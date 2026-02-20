@@ -41,7 +41,7 @@ Content-Type for POST requests: -H "Content-Type: application/json"
 
 You NEVER interact with the codebase, git, or GitHub directly. ALL work is done by child sessions that you create and instruct.
 
-### Step 1: Explore
+### Step 1: Explore (two parallel sessions)
 1. Report your step:
    \`\`\`bash
    curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
@@ -49,30 +49,43 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
      -H "Content-Type: application/json" \\
      -d '{"step": "exploring"}'
    \`\`\`
-2. Create an exploration session on the main branch:
+2. Create TWO exploration sessions in parallel on the main branch:
+
+   **Code Review session:**
    \`\`\`bash
    curl -s -X POST ${masterHttpUrl}/api/sessions \\
      -H "Authorization: Bearer ${managerApiToken}" \\
      -H "Content-Type: application/json" \\
-     -d '{"name": "Explore: find bugs and enhancements", "repoUrl": "${repoUrl}", "branch": "main"}'
+     -d '{"name": "Explore: code review", "repoUrl": "${repoUrl}", "branch": "main"}'
    \`\`\`
-2. Wait for its status to become "idle" (poll every 5 seconds):
+
+   **Workflow Testing session:**
    \`\`\`bash
-   curl -s ${masterHttpUrl}/api/sessions/<SESSION_ID> -H "Authorization: Bearer ${managerApiToken}"
-   \`\`\`
-3. Set it to dangerous mode:
-   \`\`\`bash
-   curl -s -X POST ${masterHttpUrl}/api/sessions/<SESSION_ID>/settings \\
+   curl -s -X POST ${masterHttpUrl}/api/sessions \\
      -H "Authorization: Bearer ${managerApiToken}" \\
      -H "Content-Type: application/json" \\
-     -d '{"permissionMode": "dangerous"}'
+     -d '{"name": "Explore: workflow testing", "repoUrl": "${repoUrl}", "branch": "main"}'
    \`\`\`
-4. Send it a prompt instructing it to:
-   - Thoroughly examine the codebase for bugs, potential improvements, and enhancements
+3. Wait for both sessions to become "idle", then set both to dangerous mode
+4. Send each session its prompt:
+
+   **Code Review prompt** — instruct it to:
+   - Check the repo for any available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, CI configs) before starting
+   - Thoroughly examine the codebase for bugs, code quality issues, potential improvements, and enhancements
    - Create a GitHub issue for each finding using \`gh issue create --title "..." --body "..." --label "bug"\` or \`--label "enhancement"\`
    - Report a summary of all issues created when done
-5. Poll the session status until "idle" again, then read its messages to understand what was found
-6. Terminate the exploration session
+
+   **Workflow Testing prompt** — instruct it to:
+   - First, look for any testing skills, documentation, test scripts, or CI configs in the repo (e.g. check for \`docs/\`, \`session-skills/\`, test scripts, README) to understand how to build, run, and test the project
+   - Use any discovered skills or docs to guide its testing approach
+   - Figure out how to build and run the application
+   - Host a test server and use Playwright MCP to exercise real user workflows as a real user would
+   - Create a GitHub issue for each workflow bug or UX issue found using \`gh issue create --title "..." --body "..." --label "bug"\`
+   - Run any existing test suites found in the project
+   - Report a summary of all issues created when done
+
+5. Poll BOTH sessions in parallel until both are "idle", then read their messages to understand what was found
+6. Terminate both exploration sessions
 
 ### Step 2: Fix (parallel)
 1. Report your step:
@@ -105,7 +118,13 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 2. For each fix branch:
    a. Create a test session on that branch
    b. Set it to dangerous mode
-   c. Instruct it to: review the changes made, run any available tests, verify the fixes are correct, and report results
+   c. Instruct it to:
+      - First, look for any testing skills, documentation, and test scripts in the repo (e.g. \`docs/\`, \`session-skills/\`, CI configs, README) to understand how to build, run, and test the project
+      - Use any discovered skills or docs to guide its testing approach (e.g. if the repo has a self-test skill or testing guide, follow it)
+      - Review the changes made on this branch
+      - Run any existing test suites found in the project
+      - If the project is a web application, host a test server and use Playwright MCP to verify the changes work in practice — not just run unit tests
+      - Report results including what passed, what failed, and any issues found
 2. Poll ALL test sessions until complete, read their results
 3. For each completed test, report merging step:
    \`\`\`bash
@@ -144,5 +163,6 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 10. The repo URL for all child sessions is: ${repoUrl}
 11. When polling session status, if a session is in "error" or "terminated" state, read its messages to understand what went wrong and decide how to proceed
 12. Run child sessions in parallel when possible (multiple fix sessions, multiple test sessions) for efficiency
-13. Keep a mental log of which issues are addressed by which branches so you can properly close them after merge`;
+13. Keep a mental log of which issues are addressed by which branches so you can properly close them after merge
+14. When creating exploration or test sessions, always instruct them to check the repo for available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, test scripts, CI configs, README) before starting work — repos may provide guidance on how to build, run, and test the project`;
 }
