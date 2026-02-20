@@ -36,6 +36,7 @@ export interface SessionInfo {
   contextUsage: ContextUsage | null;
   isManager?: boolean;
   managerState?: ManagerState;
+  managedBy?: string;
 }
 
 export interface SessionMessage {

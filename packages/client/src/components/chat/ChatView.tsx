@@ -146,6 +146,9 @@ export function ChatView() {
           {session?.isManager && (
             <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0">Manager</span>
           )}
+          {session?.managedBy && (
+            <span className="inline-block text-xs font-semibold text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0">Managed</span>
+          )}
           {session?.managerState && (
             <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0 capitalize">
               {session.managerState.currentStep}

@@ -173,6 +173,13 @@ export class SessionManager {
     session.managerState.childSessionIds.push(childId);
     session.info.managerState = session.managerState;
     this.emit(managerId, 'session_update', session.info);
+
+    // Set reverse link on the child so the UI can show a "Managed" badge
+    const child = this.sessions.get(childId);
+    if (child) {
+      child.info.managedBy = managerId;
+      this.emit(childId, 'session_update', child.info);
+    }
   }
 
   // Update the current step for a manager session

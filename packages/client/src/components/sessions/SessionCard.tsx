@@ -30,6 +30,9 @@ export function SessionCard({ session }: { session: SessionInfo }) {
           {session.isManager && (
             <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 align-middle">Manager</span>
           )}
+          {session.managedBy && (
+            <span className="inline-block text-xs font-semibold text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 align-middle">Managed</span>
+          )}
           {session.name}
         </h3>
         <div className="flex items-center gap-2">
