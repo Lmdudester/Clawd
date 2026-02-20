@@ -16,6 +16,8 @@ export interface SessionContainerConfig {
   oauthToken?: string;
   permissionMode?: string;
   dockerAccess?: boolean;
+  managerMode?: boolean;
+  managerApiToken?: string;
 }
 
 export class ContainerManager {
@@ -92,6 +94,13 @@ export class ContainerManager {
     if (cfg.gitUserName) env.push(`GIT_USER_NAME=${cfg.gitUserName}`);
     if (cfg.gitUserEmail) env.push(`GIT_USER_EMAIL=${cfg.gitUserEmail}`);
     if (cfg.oauthToken) env.push(`CLAUDE_CODE_OAUTH_TOKEN=${cfg.oauthToken}`);
+
+    // Manager mode env vars
+    if (cfg.managerMode) {
+      env.push('MANAGER_MODE=true');
+      if (cfg.managerApiToken) env.push(`MANAGER_API_TOKEN=${cfg.managerApiToken}`);
+      env.push(`MASTER_HTTP_URL=http://${config.masterHostname}:${config.port}`);
+    }
 
     // Build volume binds — mount only the credentials file, not the whole .claude dir,
     // so the SDK can still create writable dirs like .claude/debug/

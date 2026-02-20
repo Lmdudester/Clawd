@@ -34,7 +34,15 @@ export function SessionCard({ session }: { session: SessionInfo }) {
       className="w-full text-left p-4 bg-blue-950/25 hover:bg-blue-950/40 border border-blue-900/25 rounded-xl transition-colors"
     >
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-lg font-medium text-white truncate">{session.name}</h3>
+        <h3 className="text-lg font-medium text-white truncate">
+          {session.isManager && (
+            <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 align-middle">Manager</span>
+          )}
+          {session.managedBy && (
+            <span className="inline-block text-xs font-semibold text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 align-middle">Managed</span>
+          )}
+          {session.name}
+        </h3>
         <div className="flex items-center gap-2">
           {session.permissionMode === 'plan' && (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-4 h-4 ${MODE_THEME.plan.icon}`} aria-label="Plan mode">
@@ -47,7 +55,7 @@ export function SessionCard({ session }: { session: SessionInfo }) {
               <path d="M11.288 4.818A1.5 1.5 0 0 0 9 6.095v7.81a1.5 1.5 0 0 0 2.288 1.276l6.323-3.905a1.5 1.5 0 0 0 0-2.552l-6.323-3.906Z" />
             </svg>
           )}
-          {session.permissionMode === 'dangerous' && (
+          {session.permissionMode === 'dangerous' && !session.isManager && (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-4 h-4 ${MODE_THEME.dangerous.icon}`} aria-label="Dangerous mode">
               <path d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" />
             </svg>
@@ -69,6 +77,23 @@ export function SessionCard({ session }: { session: SessionInfo }) {
           </button>
         </div>
       </div>
+      {session.managerState && (
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded capitalize">
+            {session.managerState.currentStep}
+          </span>
+          {session.managerState.childSessionIds.length > 0 && (
+            <span className="text-xs text-slate-400">
+              {session.managerState.childSessionIds.length} child session{session.managerState.childSessionIds.length !== 1 ? 's' : ''}
+            </span>
+          )}
+          {session.managerState.paused && (
+            <span className="text-xs font-semibold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded">
+              Paused
+            </span>
+          )}
+        </div>
+      )}
       {session.lastMessagePreview && (
         <p className="text-base text-slate-400 truncate">{session.lastMessagePreview}</p>
       )}

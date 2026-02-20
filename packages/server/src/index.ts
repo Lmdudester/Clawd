@@ -19,6 +19,7 @@ import { Notifier } from './notifications/notifier.js';
 import { setupWebSocket } from './ws/handler.js';
 import { setupInternalWebSocket } from './ws/internal-handler.js';
 import { config } from './config.js';
+import { setManagerTokenValidator } from './auth/middleware.js';
 import { networkInterfaces } from 'os';
 
 // Global error handlers
@@ -60,6 +61,10 @@ if (notifier.enabled) {
 const containerManager = new ContainerManager();
 
 const sessionManager = new SessionManager(credentialStore, containerManager);
+
+// Allow manager sessions to authenticate via their API tokens
+setManagerTokenValidator((token) => sessionManager.validateManagerToken(token));
+
 const app = createApp(sessionManager, credentialStore, projectRepoStore);
 const server = createServer(app);
 

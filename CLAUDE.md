@@ -41,6 +41,10 @@ packages/client/           packages/server/                    packages/session-
 - These are rendered as a `PlanCard` component with collapsible preview and full-screen overlay.
 - Plans use the standard Claude Code plan mode flow (EnterPlanMode -> write plan -> ExitPlanMode).
 
+## Testing
+
+This project has testing skills available as slash commands. When doing testing or QA work, check your available skills (type `/` to see them) — they provide step-by-step instructions for spinning up isolated test instances and running E2E tests with Playwright MCP. The `docs/` directory also contains testing scripts and references.
+
 ## Conventions
 
 - npm workspaces (not yarn/pnpm)

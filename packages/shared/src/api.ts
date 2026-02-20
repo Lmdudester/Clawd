@@ -14,6 +14,15 @@ export interface CreateSessionRequest {
   repoUrl: string;
   branch: string;
   dockerAccess?: boolean;
+  managerMode?: boolean;
+}
+
+export interface SendMessageRequest {
+  content: string;
+}
+
+export interface SessionMessagesResponse {
+  messages: import('./session.js').SessionMessage[];
 }
 
 export interface SessionListResponse {
@@ -91,6 +100,12 @@ export interface SkillInfo {
 
 export interface SkillsResponse {
   skills: SkillInfo[];
+}
+
+// Manager state API types
+
+export interface UpdateManagerStepRequest {
+  step: import('./session.js').ManagerStep;
 }
 
 // Usage / Rate Limit types

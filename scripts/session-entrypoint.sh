@@ -15,10 +15,15 @@ fi
 # Allow git to operate on volumes with different ownership
 git config --global --add safe.directory '*'
 
-# 2. Clone repo + branch
-if [ -n "$GIT_REPO_URL" ]; then
-    echo "[session] Cloning $GIT_REPO_URL (branch: ${GIT_BRANCH:-main})..."
-    git clone --depth 1 --branch "${GIT_BRANCH:-main}" "$GIT_REPO_URL" /workspace
+# 2. Clone repo + branch (skip for manager sessions)
+if [ "$MANAGER_MODE" = "true" ]; then
+    echo "[session] Manager mode — skipping repo clone"
+    mkdir -p /workspace
+else
+    if [ -n "$GIT_REPO_URL" ]; then
+        echo "[session] Cloning $GIT_REPO_URL (branch: ${GIT_BRANCH:-main})..."
+        git clone --depth 1 --branch "${GIT_BRANCH:-main}" "$GIT_REPO_URL" /workspace
+    fi
 fi
 cd /workspace
 

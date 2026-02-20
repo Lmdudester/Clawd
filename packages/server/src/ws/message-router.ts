@@ -108,6 +108,16 @@ export class MessageRouter {
         });
         break;
 
+      case 'pause_manager':
+        this.sessionManager.pauseManager(message.sessionId).catch((err) => {
+          console.error(`WS: pause_manager error for session ${message.sessionId}:`, err);
+        });
+        break;
+
+      case 'resume_manager':
+        this.sessionManager.resumeManager(message.sessionId);
+        break;
+
       case 'update_session_settings':
         this.sessionManager.updateSessionSettings(message.sessionId, message.settings);
         break;

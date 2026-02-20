@@ -37,6 +37,8 @@ function createMockSessionManager() {
       status: 'starting',
     })),
     deleteSession: vi.fn(async () => {}),
+    sendMessage: vi.fn(),
+    updateSessionSettings: vi.fn(),
   } as any;
 }
 
@@ -108,7 +110,7 @@ describe('session routes', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.session.name).toBe('New Session');
-    expect(sm.createSession).toHaveBeenCalledWith('New Session', 'https://github.com/test/repo', 'main', false);
+    expect(sm.createSession).toHaveBeenCalledWith('New Session', 'https://github.com/test/repo', 'main', false, false);
   });
 
   it('POST /api/sessions returns 400 without name', async () => {

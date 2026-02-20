@@ -130,23 +130,29 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
           {/* Permission Mode */}
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1.5">Permission Mode</label>
-            <div className="flex rounded-lg overflow-hidden border border-slate-600">
-              {PERMISSION_MODES.map((mode) => (
-                <button
-                  key={mode.value}
-                  onClick={() => onUpdateSettings({ permissionMode: mode.value })}
-                  disabled={isErrored}
-                  title={isErrored ? 'Cannot change settings on an errored session' : mode.description}
-                  className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-                    session.permissionMode === mode.value
-                      ? MODE_THEME[mode.value].toggle
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  } ${isErrored ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
+            {session.isManager ? (
+              <div className="px-4 py-2.5 bg-purple-500/20 border border-purple-500/30 rounded-lg text-sm text-purple-300 font-medium">
+                Manager — autonomous orchestration, all tools auto-approved
+              </div>
+            ) : (
+              <div className="flex rounded-lg overflow-hidden border border-slate-600">
+                {PERMISSION_MODES.map((mode) => (
+                  <button
+                    key={mode.value}
+                    onClick={() => onUpdateSettings({ permissionMode: mode.value })}
+                    disabled={isErrored}
+                    title={isErrored ? 'Cannot change settings on an errored session' : mode.description}
+                    className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                      session.permissionMode === mode.value
+                        ? MODE_THEME[mode.value].toggle
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    } ${isErrored ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Notifications */}

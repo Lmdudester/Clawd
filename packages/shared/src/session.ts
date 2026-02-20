@@ -11,6 +11,23 @@ export type SessionStatus =
   | 'error'
   | 'terminated';
 
+export type ManagerStep = 'idle' | 'exploring' | 'fixing' | 'testing' | 'merging';
+
+export type ManagerFocus = 'bugs' | 'enhancements' | 'both';
+
+export interface ManagerPreferences {
+  focus: ManagerFocus;
+  skipExploration: boolean;
+}
+
+export interface ManagerState {
+  targetBranch: string;
+  currentStep: ManagerStep;
+  childSessionIds: string[];
+  preferences?: ManagerPreferences;
+  paused?: boolean;
+}
+
 export interface SessionInfo {
   id: string;
   name: string;
@@ -26,6 +43,9 @@ export interface SessionInfo {
   model: string | null;
   notificationsEnabled: boolean;
   contextUsage: ContextUsage | null;
+  isManager?: boolean;
+  managerState?: ManagerState;
+  managedBy?: string;
 }
 
 export interface SessionMessage {

@@ -4,6 +4,15 @@ import { config } from '../config.js';
 
 export interface AuthRequest extends Request {
   user?: { username: string };
+  managerApiToken?: string;
+}
+
+// Optional external validator for manager API tokens.
+// Set by the server at startup to allow manager sessions to authenticate.
+let managerTokenValidator: ((token: string) => boolean) | null = null;
+
+export function setManagerTokenValidator(validator: (token: string) => boolean): void {
+  managerTokenValidator = validator;
 }
 
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): void {
@@ -14,6 +23,15 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   }
 
   const token = authHeader.slice(7);
+
+  // Check manager API tokens first
+  if (managerTokenValidator && managerTokenValidator(token)) {
+    req.user = { username: 'manager' };
+    req.managerApiToken = token;
+    next();
+    return;
+  }
+
   try {
     const payload = jwt.verify(token, config.jwtSecret) as { username: string };
     req.user = { username: payload.username };

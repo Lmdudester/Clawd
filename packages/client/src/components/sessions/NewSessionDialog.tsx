@@ -20,6 +20,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
   const [isNewBranch, setIsNewBranch] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
   const [dockerAccess, setDockerAccess] = useState(false);
+  const [managerMode, setManagerMode] = useState(false);
 
   const addSession = useSessionStore((s) => s.addSession);
   const navigate = useNavigate();
@@ -113,7 +114,10 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
         });
       }
 
-      const res = await api.createSession({ name, repoUrl, branch: effectiveBranch, dockerAccess });
+      const finalBranch = managerMode
+        ? (selectedRepo !== null ? repos[selectedRepo].defaultBranch : 'main')
+        : effectiveBranch;
+      const res = await api.createSession({ name, repoUrl, branch: finalBranch, dockerAccess, managerMode });
       addSession(res.session);
       navigate(`/session/${res.session.id}`);
       onClose();
@@ -125,6 +129,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
       setIsNewBranch(false);
       setNewBranchName('');
       setDockerAccess(false);
+      setManagerMode(false);
     } catch (err: any) {
       setError(err.message || 'Failed to create session');
     } finally {
@@ -206,57 +211,83 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
             />
           )}
 
-          {/* Branch dropdown */}
-          {branchesLoading ? (
-            <div className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-400 text-sm">
-              Loading branches...
-            </div>
-          ) : branches.length > 0 ? (
+          {/* Branch dropdown — hidden for manager mode */}
+          {!managerMode && (
             <>
-              <select
-                value={isNewBranch ? '__new__' : branch}
-                onChange={(e) => handleBranchChange(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-              >
-                {branches.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-                <option value="__new__">Create New Branch...</option>
-              </select>
+              {branchesLoading ? (
+                <div className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-400 text-sm">
+                  Loading branches...
+                </div>
+              ) : branches.length > 0 ? (
+                <>
+                  <select
+                    value={isNewBranch ? '__new__' : branch}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  >
+                    {branches.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                    <option value="__new__">Create New Branch...</option>
+                  </select>
 
-              {isNewBranch && (
+                  {isNewBranch && (
+                    <input
+                      type="text"
+                      placeholder="New branch name"
+                      value={newBranchName}
+                      onChange={(e) => setNewBranchName(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                      autoFocus
+                    />
+                  )}
+                </>
+              ) : (
                 <input
                   type="text"
-                  placeholder="New branch name"
-                  value={newBranchName}
-                  onChange={(e) => setNewBranchName(e.target.value)}
+                  placeholder="Branch (e.g. main)"
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                  autoFocus
                 />
               )}
             </>
-          ) : (
-            <input
-              type="text"
-              placeholder="Branch (e.g. main)"
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-            />
+          )}
+
+          {/* Docker access — hidden for manager mode */}
+          {!managerMode && (
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={dockerAccess}
+                onChange={(e) => setDockerAccess(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+              />
+              <div>
+                <span className="text-sm text-white">Docker access</span>
+                <p className="text-xs text-slate-400">Mount Docker socket for container management</p>
+              </div>
+            </label>
           )}
 
           <label className="flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
-              checked={dockerAccess}
-              onChange={(e) => setDockerAccess(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+              checked={managerMode}
+              onChange={(e) => setManagerMode(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
             />
             <div>
-              <span className="text-sm text-white">Docker access</span>
-              <p className="text-xs text-slate-400">Mount Docker socket for container management</p>
+              <span className="text-sm text-white">Independent Manager</span>
+              <p className="text-xs text-slate-400">Autonomous session that orchestrates child sessions to find and fix issues</p>
             </div>
           </label>
+
+          {managerMode && (
+            <div className="px-3 py-2 bg-purple-500/10 border border-purple-500/20 rounded-lg text-sm text-purple-300">
+              Manager sessions use the default branch and dangerous mode. The session will orchestrate child sessions to do all work.
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button
@@ -269,7 +300,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
             </button>
             <button
               type="submit"
-              disabled={loading || !name || !repoUrl || !effectiveBranch}
+              disabled={loading || !name || !repoUrl || (!managerMode && !effectiveBranch)}
               className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors"
               data-testid="create-session-button"
             >
