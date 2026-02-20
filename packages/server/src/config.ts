@@ -32,6 +32,9 @@ export const config = {
   sessionCpuShares: parseInt(process.env.SESSION_CPU_SHARES || '512'),
   sessionPidsLimit: parseInt(process.env.SESSION_PIDS_LIMIT || '256'),
 
+  // Maximum number of concurrent sessions (0 = unlimited)
+  maxSessions: parseInt(process.env.MAX_SESSIONS || '50'),
+
   // Project repos config file path
   projectReposPath: process.env.PROJECT_REPOS_PATH || resolve(projectRoot, 'project-repos.json'),
 };

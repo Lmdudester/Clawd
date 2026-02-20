@@ -27,7 +27,8 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       const session = await sessionManager.createSession(name, repoUrl, branch, !!dockerAccess);
       res.status(201).json({ session });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Failed to create session' });
+      const status = err.message?.includes('Session limit reached') ? 429 : 500;
+      res.status(status).json({ error: err.message || 'Failed to create session' });
     }
   });
 

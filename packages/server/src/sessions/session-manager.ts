@@ -11,6 +11,7 @@ import type {
   AgentToMasterMessage,
   MasterToAgentMessage,
 } from '@clawd/shared';
+import { config } from '../config.js';
 import type { CredentialStore } from '../settings/credential-store.js';
 import type { ContainerManager, SessionContainerConfig } from './container-manager.js';
 
@@ -66,6 +67,16 @@ export class SessionManager {
   }
 
   async createSession(name: string, repoUrl: string, branch: string, dockerAccess = false): Promise<SessionInfo> {
+    // Enforce maximum session limit to prevent unbounded container creation
+    if (config.maxSessions > 0) {
+      const activeSessions = Array.from(this.sessions.values()).filter(
+        (s) => s.info.status !== 'terminated' && s.info.status !== 'error',
+      );
+      if (activeSessions.length >= config.maxSessions) {
+        throw new Error(`Session limit reached (max ${config.maxSessions}). Terminate existing sessions before creating new ones.`);
+      }
+    }
+
     const id = uuid();
     const sessionToken = v4();
 
