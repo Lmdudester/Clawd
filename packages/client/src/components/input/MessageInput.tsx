@@ -17,6 +17,13 @@ export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt }:
   const [showSkillPicker, setShowSkillPicker] = useState(false);
   const skillsFetchedRef = useRef(false);
 
+  // Auto-focus on mount and when transitioning from disabled to enabled
+  useEffect(() => {
+    if (!disabled) {
+      inputRef.current?.focus();
+    }
+  }, [disabled]);
+
   // Fetch skills once on mount
   useEffect(() => {
     if (skillsFetchedRef.current) return;

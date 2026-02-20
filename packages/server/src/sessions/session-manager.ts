@@ -1,4 +1,4 @@
-import { v4 as uuid, v4 } from 'uuid';
+import { v4 as uuid } from 'uuid';
 import type { WebSocket } from 'ws';
 import type {
   SessionInfo,
@@ -78,7 +78,7 @@ export class SessionManager {
     }
 
     const id = uuid();
-    const sessionToken = v4();
+    const sessionToken = uuid();
 
     const info: SessionInfo = {
       id,

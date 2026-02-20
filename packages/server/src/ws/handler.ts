@@ -95,19 +95,35 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, c
     });
   });
 
+  const AUTH_TIMEOUT_MS = 10_000;
+
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected');
 
+    // Close the connection if the client doesn't authenticate within the timeout
+    const authTimeout = setTimeout(() => {
+      if (!connectionManager.isAuthenticated(ws)) {
+        console.warn('WS: closing unauthenticated connection after timeout');
+        ws.close(4001, 'Authentication timeout');
+      }
+    }, AUTH_TIMEOUT_MS);
+
     ws.on('message', (data) => {
       messageRouter.handleMessage(ws, data.toString());
+      // Clear the timeout once authenticated
+      if (connectionManager.isAuthenticated(ws)) {
+        clearTimeout(authTimeout);
+      }
     });
 
     ws.on('close', () => {
+      clearTimeout(authTimeout);
       console.log('WebSocket client disconnected');
       connectionManager.removeClient(ws);
     });
 
     ws.on('error', (err) => {
+      clearTimeout(authTimeout);
       console.error('WebSocket client error:', err);
       connectionManager.removeClient(ws);
     });

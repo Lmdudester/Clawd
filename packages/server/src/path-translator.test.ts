@@ -42,6 +42,28 @@ describe('containerToWindows', () => {
   });
 });
 
+describe('other drive letters', () => {
+  it('converts D:\\ path to container path', () => {
+    expect(windowsToContainer('D:\\Data\\files')).toBe('/host/d/Data/files');
+  });
+
+  it('converts E:/ path to container path', () => {
+    expect(windowsToContainer('E:/Games/save')).toBe('/host/e/Games/save');
+  });
+
+  it('converts container D: path back to Windows path', () => {
+    expect(containerToWindows('/host/d/Data/files')).toBe('D:\\Data\\files');
+  });
+
+  it('round-trips D: drive path', () => {
+    const original = 'D:\\Projects\\my-app\\src\\index.ts';
+    const containerPath = windowsToContainer(original);
+    expect(containerPath).toBe('/host/d/Projects/my-app/src/index.ts');
+    const restored = containerToWindows(containerPath);
+    expect(restored).toBe(original);
+  });
+});
+
 describe('round-trip', () => {
   it('windowsToContainer then containerToWindows preserves Windows path', () => {
     const original = 'C:\\Users\\dev\\workspace\\file.ts';

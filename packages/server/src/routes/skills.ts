@@ -15,21 +15,45 @@ export function parseFrontmatter(content: string): Record<string, string> {
   const result: Record<string, string> = {};
   for (const line of match[1].split('\n')) {
     const idx = line.indexOf(':');
-    if (idx > 0) {
-      result[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    if (!key) continue;
+    let value = line.slice(idx + 1).trim();
+    // Strip inline comments (only when not inside quotes)
+    if (!value.startsWith('"') && !value.startsWith("'")) {
+      const commentIdx = value.indexOf(' #');
+      if (commentIdx >= 0) {
+        value = value.slice(0, commentIdx).trimEnd();
+      }
     }
+    // Strip surrounding quotes
+    if (
+      value.length >= 2 &&
+      ((value[0] === '"' && value[value.length - 1] === '"') ||
+        (value[0] === "'" && value[value.length - 1] === "'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
   }
   return result;
 }
 
 let cachedSkills: SkillInfo[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 30_000; // Re-scan skills directory every 30 seconds
+
+export function invalidateSkillCache(): void {
+  cachedSkills = null;
+  cacheTimestamp = 0;
+}
 
 export function createSkillRoutes(): Router {
   const router = Router();
   router.use(authMiddleware);
 
   router.get('/', async (_req, res) => {
-    if (cachedSkills) {
+    if (cachedSkills && Date.now() - cacheTimestamp < CACHE_TTL_MS) {
       const response: SkillsResponse = { skills: cachedSkills };
       res.json(response);
       return;
@@ -57,6 +81,7 @@ export function createSkillRoutes(): Router {
       }
 
       cachedSkills = skills;
+      cacheTimestamp = Date.now();
       const response: SkillsResponse = { skills };
       res.json(response);
     } catch {
