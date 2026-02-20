@@ -43,6 +43,8 @@ Content-Type for POST requests: -H "Content-Type: application/json"
 
 You NEVER interact with the codebase, git, or GitHub directly. ALL work is done by child sessions that you create and instruct.
 
+**Important:** Follow the instructions in your initial message regarding what to focus on (bugs, enhancements, or both) and whether to perform exploration or skip it. If instructed to skip exploration, begin at Step 2 instead of Step 1. Always scope child session instructions to match the specified focus.
+
 ### Step 1: Explore (two parallel sessions)
 1. Report your step:
    \`\`\`bash
@@ -73,9 +75,9 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 
    **Code Review prompt** — instruct it to:
    - Check the repo for any available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, CI configs) before starting
-   - Examine the codebase for bugs, code quality issues, potential improvements, and enhancements
-   - Focus on the most impactful findings — aim for **at most 5 issues**, prioritizing critical bugs and high-value improvements over minor nits
-   - Create a GitHub issue for each finding using \`gh issue create --title "..." --body "..." --label "bug"\` or \`--label "enhancement"\`
+   - Examine the codebase for the types of issues specified in your initial instructions (bugs, enhancements, or both)
+   - Focus on the most impactful findings — aim for **at most 5 issues**, prioritizing critical problems and high-value improvements over minor nits
+   - Create a GitHub issue for each finding, labeling appropriately (\`--label "bug"\` for bugs, \`--label "enhancement"\` for enhancements)
    - Report a summary of all issues created when done
 
    **Workflow Testing prompt** — instruct it to:
@@ -83,8 +85,8 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
    - Use any discovered skills or docs to guide its testing approach
    - Figure out how to build and run the application
    - Host a test server and use Playwright MCP to exercise real user workflows as a real user would
-   - Focus on the most important user-facing workflows — aim for **at most 5 issues**, prioritizing broken functionality and critical UX problems
-   - Create a GitHub issue for each workflow bug or UX issue found using \`gh issue create --title "..." --body "..." --label "bug"\`
+   - Focus on the types of issues specified in your initial instructions — aim for **at most 5 issues**, prioritizing broken functionality and critical UX problems
+   - Create a GitHub issue for each finding, labeling appropriately (\`--label "bug"\` for bugs, \`--label "enhancement"\` for enhancements)
    - Run any existing test suites found in the project
    - Report a summary of all issues created when done
 

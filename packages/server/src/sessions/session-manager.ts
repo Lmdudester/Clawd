@@ -12,6 +12,8 @@ import type {
   MasterToAgentMessage,
   ManagerState,
   ManagerStep,
+  ManagerFocus,
+  ManagerPreferences,
 } from '@clawd/shared';
 import type { CredentialStore } from '../settings/credential-store.js';
 import type { ContainerManager, SessionContainerConfig } from './container-manager.js';
@@ -266,11 +268,9 @@ export class SessionManager {
           content: 'Session container ready',
           timestamp: new Date().toISOString(),
         });
-        // Auto-send initial prompt for manager sessions
+        // Show onboarding questions for manager sessions instead of auto-starting
         if (session.info.isManager) {
-          setTimeout(() => {
-            this.sendMessage(sessionId, 'Begin your independent manager loop. Start with Step 1: create an exploration session to find bugs and enhancements in this repository. Track all findings as GitHub issues.');
-          }, 1000);
+          this.showManagerOnboarding(sessionId);
         }
         break;
 
@@ -407,6 +407,14 @@ export class SessionManager {
   answerQuestion(sessionId: string, questionId: string, answers: Record<string, string>): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+
+    // Intercept server-generated onboarding questions for manager sessions
+    if (session.pendingQuestion?.id === questionId && session.info.isManager && !session.managerState?.preferences) {
+      session.pendingQuestion = null;
+      this.handleManagerOnboardingAnswer(sessionId, answers);
+      return;
+    }
+
     session.pendingQuestion = null;
     this.sendToAgent(sessionId, { type: 'question_response', questionId, answers });
   }
@@ -495,9 +503,109 @@ export class SessionManager {
       const s = this.sessions.get(sessionId);
       if (!s || s.info.status !== 'idle' || !s.info.isManager) return;
 
+      const prefs = s.managerState?.preferences;
+      const focusReminder = prefs
+        ? ` Remember: focus on ${prefs.focus === 'bugs' ? 'bugs only' : prefs.focus === 'enhancements' ? 'enhancements only' : 'both bugs and enhancements'}.`
+        : '';
+
       console.log(`[session:${sessionId}] Auto-continuing manager session`);
-      this.sendMessage(sessionId, 'Continue your manager loop. Check on child sessions and proceed with the next step.');
+      this.sendMessage(sessionId, `Continue your manager loop. Check on child sessions and proceed with the next step.${focusReminder}`);
     }, 3000);
+  }
+
+  private showManagerOnboarding(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    const questionId = uuid();
+    const question: PendingQuestion = {
+      id: questionId,
+      questions: [
+        {
+          question: 'What should the manager focus on?',
+          header: 'Focus',
+          options: [
+            { label: 'Bugs', description: 'Find and fix bugs only' },
+            { label: 'Enhancements', description: 'Find and implement enhancements only' },
+            { label: 'Both', description: 'Find and address both bugs and enhancements' },
+          ],
+          multiSelect: false,
+        },
+        {
+          question: 'Should the manager explore the codebase first?',
+          header: 'Exploration',
+          options: [
+            { label: 'Explore', description: 'Run exploration sessions to discover issues before fixing' },
+            { label: 'Skip exploration', description: 'Skip exploration and go straight to fixing existing GitHub issues' },
+          ],
+          multiSelect: false,
+        },
+      ],
+      timestamp: new Date().toISOString(),
+    };
+
+    session.pendingQuestion = question;
+    this.updateStatus(session, 'awaiting_answer');
+    this.emit(sessionId, 'question', question);
+
+    this.addMessage(session, {
+      id: uuid(),
+      sessionId,
+      type: 'system',
+      content: 'Manager session ready. Please configure preferences before starting.',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  private handleManagerOnboardingAnswer(sessionId: string, answers: Record<string, string>): void {
+    const session = this.sessions.get(sessionId);
+    if (!session?.managerState) return;
+
+    const focusAnswer = answers['What should the manager focus on?'] ?? 'Both';
+    const explorationAnswer = answers['Should the manager explore the codebase first?'] ?? 'Explore';
+
+    const focus: ManagerFocus =
+      focusAnswer.toLowerCase().includes('bug') ? 'bugs' :
+      focusAnswer.toLowerCase().includes('enhancement') ? 'enhancements' :
+      'both';
+
+    const skipExploration = explorationAnswer.toLowerCase().includes('skip');
+
+    const preferences: ManagerPreferences = { focus, skipExploration };
+
+    session.managerState.preferences = preferences;
+    session.info.managerState = session.managerState;
+    this.emit(sessionId, 'session_update', session.info);
+
+    this.updateStatus(session, 'idle');
+
+    this.addMessage(session, {
+      id: uuid(),
+      sessionId,
+      type: 'system',
+      content: `Manager configured: focus=${focus}, exploration=${skipExploration ? 'skip' : 'enabled'}`,
+      timestamp: new Date().toISOString(),
+    });
+
+    const initialMessage = this.buildManagerInitialMessage(preferences);
+    setTimeout(() => {
+      this.sendMessage(sessionId, initialMessage);
+    }, 500);
+  }
+
+  private buildManagerInitialMessage(preferences: ManagerPreferences): string {
+    const { focus, skipExploration } = preferences;
+
+    const focusDescription =
+      focus === 'bugs' ? 'bugs and code quality issues' :
+      focus === 'enhancements' ? 'enhancements and improvements' :
+      'bugs and enhancements';
+
+    if (skipExploration) {
+      return `Begin your independent manager loop. Skip exploration — go directly to Step 2 (Fix). Look at existing GitHub issues with \`gh issue list\` and focus on ${focusDescription}. Triage the issues, then create fix sessions for each group.`;
+    }
+
+    return `Begin your independent manager loop. Start with Step 1: create exploration sessions to find ${focusDescription} in this repository. Track all findings as GitHub issues.`;
   }
 
   private updateStatus(session: ManagedSession, status: SessionStatus): void {

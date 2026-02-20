@@ -13,10 +13,18 @@ export type SessionStatus =
 
 export type ManagerStep = 'idle' | 'exploring' | 'fixing' | 'testing' | 'merging';
 
+export type ManagerFocus = 'bugs' | 'enhancements' | 'both';
+
+export interface ManagerPreferences {
+  focus: ManagerFocus;
+  skipExploration: boolean;
+}
+
 export interface ManagerState {
   targetBranch: string;
   currentStep: ManagerStep;
   childSessionIds: string[];
+  preferences?: ManagerPreferences;
 }
 
 export interface SessionInfo {
