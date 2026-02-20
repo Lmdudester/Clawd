@@ -17,8 +17,8 @@ export function SkillPicker({ skills, filter, onSelect, onClose }: Props) {
   );
 
   useEffect(() => {
-    setSelectedIndex(0);
-  }, [filter]);
+    setSelectedIndex((prev) => Math.min(prev, Math.max(filtered.length - 1, 0)));
+  }, [filtered.length]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -28,7 +28,7 @@ export function SkillPicker({ skills, filter, onSelect, onClose }: Props) {
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex((i) => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter' && filtered.length > 0) {
+      } else if (e.key === 'Enter' && filtered.length > 0 && selectedIndex >= 0 && selectedIndex < filtered.length) {
         e.preventDefault();
         onSelect(filtered[selectedIndex]);
       } else if (e.key === 'Escape') {
