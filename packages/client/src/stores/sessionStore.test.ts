@@ -100,13 +100,61 @@ describe('sessionStore', () => {
       expect(msgs).toHaveLength(2);
     });
 
-    it('deduplicates messages by ID', () => {
+    it('deduplicates messages by ID against existing', () => {
       const m1 = message({ id: 'msg-1' });
       useSessionStore.getState().addMessages('s1', [m1]);
       useSessionStore.getState().addMessages('s1', [m1, message({ id: 'msg-2' })]);
 
       const msgs = useSessionStore.getState().messages.get('s1');
       expect(msgs).toHaveLength(2);
+    });
+
+    it('deduplicates messages within the same batch', () => {
+      const m1 = message({ id: 'msg-1' });
+      const m1dup = message({ id: 'msg-1', content: 'duplicate' });
+      useSessionStore.getState().addMessages('s1', [m1, m1dup, message({ id: 'msg-2' })]);
+
+      const msgs = useSessionStore.getState().messages.get('s1')!;
+      expect(msgs).toHaveLength(2);
+      expect(msgs[0].content).toBe(m1.content);
+    });
+  });
+
+  describe('setMessages', () => {
+    it('sets messages directly when no existing messages', () => {
+      const m1 = message({ id: 'msg-1' });
+      const m2 = message({ id: 'msg-2' });
+      useSessionStore.getState().setMessages('s1', [m1, m2]);
+
+      const msgs = useSessionStore.getState().messages.get('s1');
+      expect(msgs).toHaveLength(2);
+    });
+
+    it('merges with existing messages without duplicates', () => {
+      const m1 = message({ id: 'msg-1' });
+      const m2 = message({ id: 'msg-2' });
+      const m3 = message({ id: 'msg-3' });
+      // Simulate WebSocket delivering m1 and m2 first
+      useSessionStore.getState().addMessages('s1', [m1, m2]);
+      // Simulate REST fallback delivering m1 and m3
+      useSessionStore.getState().setMessages('s1', [m1, m3]);
+
+      const msgs = useSessionStore.getState().messages.get('s1')!;
+      expect(msgs).toHaveLength(3);
+      expect(msgs.map((m) => m.id)).toEqual(['msg-1', 'msg-2', 'msg-3']);
+    });
+
+    it('preserves messages added via WebSocket when REST arrives later', () => {
+      const m1 = message({ id: 'msg-1', type: 'user' as any, content: 'hello' });
+      const m2 = message({ id: 'msg-2', type: 'assistant' as any, content: 'hi' });
+      // WebSocket delivers both
+      useSessionStore.getState().addMessages('s1', [m1, m2]);
+      // REST response contains only m1 (stale data)
+      useSessionStore.getState().setMessages('s1', [m1]);
+
+      const msgs = useSessionStore.getState().messages.get('s1')!;
+      expect(msgs).toHaveLength(2);
+      expect(msgs[1].id).toBe('msg-2');
     });
   });
 
