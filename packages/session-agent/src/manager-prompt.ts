@@ -20,10 +20,12 @@ Content-Type for POST requests: -H "Content-Type: application/json"
 - POST /api/sessions — Create session: { "name": "...", "repoUrl": "...", "branch": "..." }
   Returns: { "session": { "id": "...", "status": "starting", ... } }
 - GET /api/sessions — List all sessions
-- GET /api/sessions/:id — Get session detail including status
+- GET /api/sessions/:id — Get session detail including status and pendingApproval
+  Returns: { "session": { "id": "...", "status": "..." }, "messages": [...], "pendingApproval": { "id": "...", "toolName": "...", "toolInput": {...} } | null }
 - GET /api/sessions/:id/messages — Get all messages from a session (to read its output)
 - POST /api/sessions/:id/message — Send a prompt to a session: { "content": "..." }
-- POST /api/sessions/:id/settings — Update session settings: { "permissionMode": "dangerous" }
+- POST /api/sessions/:id/approve — Approve or deny a pending tool call: { "approvalId": "...", "allow": true/false, "message": "..." }
+- POST /api/sessions/:id/settings — Update session settings
 - DELETE /api/sessions/:id — Terminate and delete a session
 
 ### Branch Management
@@ -66,7 +68,7 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
      -H "Content-Type: application/json" \\
      -d '{"name": "Explore: workflow testing", "repoUrl": "${repoUrl}", "branch": "main"}'
    \`\`\`
-3. Wait for both sessions to become "idle", then set both to dangerous mode
+3. Wait for both sessions to become "idle"
 4. Send each session its prompt:
 
    **Code Review prompt** — instruct it to:
@@ -84,7 +86,7 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
    - Run any existing test suites found in the project
    - Report a summary of all issues created when done
 
-5. Poll BOTH sessions in parallel until both are "idle", then read their messages to understand what was found
+5. Supervise BOTH sessions using the approval polling loop (see "How to Supervise Child Sessions" below) until both are "idle", then read their messages to understand what was found
 6. Terminate both exploration sessions
 
 ### Step 2: Fix (parallel)
@@ -101,9 +103,8 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 4. For each group of related issues:
    a. Create a new branch via the API: POST /api/repos/branches with a descriptive name like "fix/auth-improvements"
    b. Create a fix session on that branch
-   c. Set it to dangerous mode
-   d. Instruct it to fix the specific issues (reference issue numbers), commit, and push when done
-5. Poll ALL fix sessions in a loop until all are idle/complete
+   c. Instruct it to fix the specific issues (reference issue numbers), commit, and push when done
+5. Supervise ALL fix sessions using the approval polling loop until all are idle/complete
 6. Read each session's messages to verify work was done, then terminate each
 7. Repeat if any issues remain unaddressed
 
@@ -117,15 +118,14 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
    \`\`\`
 2. For each fix branch:
    a. Create a test session on that branch
-   b. Set it to dangerous mode
-   c. Instruct it to:
+   b. Instruct it to:
       - First, look for any testing skills, documentation, and test scripts in the repo (e.g. \`docs/\`, \`session-skills/\`, CI configs, README) to understand how to build, run, and test the project
       - Use any discovered skills or docs to guide its testing approach (e.g. if the repo has a self-test skill or testing guide, follow it)
       - Review the changes made on this branch
       - Run any existing test suites found in the project
       - If the project is a web application, host a test server and use Playwright MCP to verify the changes work in practice — not just run unit tests
       - Report results including what passed, what failed, and any issues found
-2. Poll ALL test sessions until complete, read their results
+2. Supervise ALL test sessions using the approval polling loop until complete, read their results
 3. For each completed test, report merging step:
    \`\`\`bash
    curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
@@ -149,13 +149,43 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
    \`\`\`
 5. When all branches are merged, go back to Step 1
 
+## How to Supervise Child Sessions
+
+Child sessions run in normal permission mode, meaning they require approval for tool calls. As the manager, you are responsible for monitoring and approving these requests.
+
+**Polling loop** — poll GET /api/sessions/:id every 5 seconds and handle the status:
+- \`"running"\` → the session is working, continue polling
+- \`"awaiting_approval"\` → the session needs your approval for a tool call. GET /api/sessions/:id to read the \`pendingApproval\` field, which contains \`id\`, \`toolName\`, and \`toolInput\`. Evaluate whether the tool call is appropriate:
+  - If it looks safe and on-track, approve it:
+    \`\`\`bash
+    curl -s -X POST ${masterHttpUrl}/api/sessions/<SESSION_ID>/approve \\
+      -H "Authorization: Bearer ${managerApiToken}" \\
+      -H "Content-Type: application/json" \\
+      -d '{"approvalId": "<APPROVAL_ID>", "allow": true}'
+    \`\`\`
+  - If it looks harmful, off-track, or unnecessary, deny it with a message:
+    \`\`\`bash
+    curl -s -X POST ${masterHttpUrl}/api/sessions/<SESSION_ID>/approve \\
+      -H "Authorization: Bearer ${managerApiToken}" \\
+      -H "Content-Type: application/json" \\
+      -d '{"approvalId": "<APPROVAL_ID>", "allow": false, "message": "Reason for denial"}'
+    \`\`\`
+  - If the session is going in a completely wrong direction, you can also interrupt it by sending a new message via POST /api/sessions/:id/message to redirect it
+- \`"idle"\` → the session has finished, read its messages to see the results
+- \`"error"\` or \`"terminated"\` → read messages to understand what went wrong
+
+**What to approve:** File reads, searches, standard tool usage, git operations the session was instructed to do, running tests, and creating issues/PRs as instructed.
+**What to deny:** Destructive operations that weren't part of the instructions, attempts to modify files outside the scope of the task, force pushes, or anything that looks like it could cause damage.
+
+When supervising multiple sessions in parallel, poll each one in the same loop iteration so you don't block one session while waiting on another.
+
 ## Important Rules
 
 1. You NEVER interact with the codebase, git, or GitHub directly — ALL work is done by child sessions
 2. ALWAYS instruct child sessions to \`git push\` before you terminate them
 3. After creating a session, wait for its status to become "idle" before sending prompts (poll GET /api/sessions/:id every 5 seconds)
-4. After sending a prompt, poll status until "idle" again to know the session is done
-5. ALWAYS set child sessions to "dangerous" permission mode immediately after creation (POST /api/sessions/:id/settings)
+4. After sending a prompt, supervise the session using the approval polling loop until "idle" to know the session is done
+5. ALWAYS supervise child sessions by monitoring and responding to their pending approvals — never leave a session waiting for approval
 6. Monitor your own token usage — check GET /api/usage periodically. If you believe you cannot complete another full loop, stop gracefully after finishing current work
 7. Read any messages the user sends to you — they may provide guidance, ask you to focus on specific areas, or ask you to stop
 8. When creating child sessions, give them clear, specific instructions in a single comprehensive prompt

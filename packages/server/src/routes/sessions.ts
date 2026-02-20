@@ -51,6 +51,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     res.json({
       session: session.info,
       messages: sessionManager.getMessages(req.params.id),
+      pendingApproval: session.pendingApproval ?? null,
     });
   });
 
@@ -115,6 +116,24 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     }
 
     sessionManager.updateManagerStep(req.params.id, step);
+    res.json({ ok: true });
+  });
+
+  // Approve or deny a pending tool call
+  router.post('/:id/approve', (req, res) => {
+    const session = sessionManager.getSession(req.params.id);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    const { approvalId, allow, message } = req.body;
+    if (!approvalId || typeof allow !== 'boolean') {
+      res.status(400).json({ error: 'approvalId and allow are required' });
+      return;
+    }
+
+    sessionManager.approveToolUse(req.params.id, approvalId, allow, message);
     res.json({ ok: true });
   });
 
