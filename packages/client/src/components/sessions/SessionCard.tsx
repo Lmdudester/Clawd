@@ -47,7 +47,7 @@ export function SessionCard({ session }: { session: SessionInfo }) {
               <path d="M11.288 4.818A1.5 1.5 0 0 0 9 6.095v7.81a1.5 1.5 0 0 0 2.288 1.276l6.323-3.905a1.5 1.5 0 0 0 0-2.552l-6.323-3.906Z" />
             </svg>
           )}
-          {session.permissionMode === 'dangerous' && (
+          {session.permissionMode === 'dangerous' && !session.isManager && (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-4 h-4 ${MODE_THEME.dangerous.icon}`} aria-label="Dangerous mode">
               <path d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" />
             </svg>

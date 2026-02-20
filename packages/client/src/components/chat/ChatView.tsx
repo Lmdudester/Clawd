@@ -195,7 +195,7 @@ export function ChatView() {
           Auto-Edits — file edits in project will be approved automatically
         </div>
       )}
-      {session?.permissionMode === 'dangerous' && (
+      {session?.permissionMode === 'dangerous' && !session?.isManager && (
         <div key="mode-danger" className={`px-4 py-1.5 ${MODE_THEME.dangerous.banner} text-xs font-medium text-center shrink-0`}>
           Dangerous — all tools will be approved automatically
         </div>
