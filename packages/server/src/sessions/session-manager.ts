@@ -26,6 +26,9 @@ interface ManagedSession {
 
 type SessionEventHandler = (sessionId: string, event: string, data: unknown) => void;
 
+// Keep the most recent N messages per session to prevent unbounded memory growth.
+const MAX_MESSAGES_PER_SESSION = 500;
+
 export class SessionManager {
   private sessions = new Map<string, ManagedSession>();
   private eventHandler: SessionEventHandler | null = null;
@@ -400,6 +403,12 @@ export class SessionManager {
 
   private addMessage(session: ManagedSession, message: SessionMessage): void {
     session.messages.push(message);
+
+    // Trim oldest messages when the array exceeds the cap
+    if (session.messages.length > MAX_MESSAGES_PER_SESSION) {
+      session.messages = session.messages.slice(-MAX_MESSAGES_PER_SESSION);
+    }
+
     session.info.lastMessageAt = message.timestamp;
     session.info.lastMessagePreview =
       message.content.length > 100
