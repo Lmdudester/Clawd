@@ -121,10 +121,17 @@ export class SDKRunner {
         this.interrupt();
         break;
       case 'update_settings':
-        if (message.permissionMode) {
+        if (message.permissionMode !== undefined && message.permissionMode !== this.permissionMode) {
+          const oldMode = this.permissionMode;
           this.permissionMode = message.permissionMode as PermissionMode;
+          console.log(`[agent] permission mode changed: ${oldMode} -> ${this.permissionMode}`);
+          // Update the SDK's own mode (plan vs default). For non-plan modes
+          // the SDK stays in 'default' and our canUseTool callback enforces
+          // the actual permission semantics (dangerous/auto_edits/normal).
           const sdkMode = this.permissionMode === 'plan' ? 'plan' : 'default';
-          this.queryStream?.setPermissionMode(sdkMode);
+          if (this.queryStream) {
+            this.queryStream.setPermissionMode(sdkMode);
+          }
         }
         break;
       case 'set_model':

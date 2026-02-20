@@ -70,9 +70,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((state) => {
       const messages = new Map(state.messages);
       const existing = messages.get(sessionId) ?? [];
-      // Deduplicate by id
+      // Deduplicate by id — check against existing AND within the batch
       const existingIds = new Set(existing.map((m) => m.id));
-      const unique = newMessages.filter((m) => !existingIds.has(m.id));
+      const unique: SessionMessage[] = [];
+      for (const m of newMessages) {
+        if (!existingIds.has(m.id)) {
+          existingIds.add(m.id);
+          unique.push(m);
+        }
+      }
       messages.set(sessionId, [...existing, ...unique]);
       return { messages };
     }),
@@ -80,7 +86,24 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setMessages: (sessionId, msgs) =>
     set((state) => {
       const messages = new Map(state.messages);
-      messages.set(sessionId, msgs);
+      const existing = messages.get(sessionId) ?? [];
+      if (existing.length === 0) {
+        // No existing messages — just set directly (fast path)
+        messages.set(sessionId, msgs);
+      } else {
+        // Merge: keep existing messages, add any new ones from the incoming
+        // list that don't already exist. This prevents the REST fallback from
+        // overwriting messages that arrived via WebSocket in the meantime.
+        const seenIds = new Set(existing.map((m) => m.id));
+        const extra: SessionMessage[] = [];
+        for (const m of msgs) {
+          if (!seenIds.has(m.id)) {
+            seenIds.add(m.id);
+            extra.push(m);
+          }
+        }
+        messages.set(sessionId, [...existing, ...extra]);
+      }
       return { messages };
     }),
 
