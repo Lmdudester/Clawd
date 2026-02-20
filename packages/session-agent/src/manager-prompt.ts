@@ -46,13 +46,7 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 **Important:** Follow the instructions in your initial message regarding what to focus on (bugs, enhancements, or both) and whether to perform exploration or skip it. If instructed to skip exploration, begin at Step 2 instead of Step 1. Always scope child session instructions to match the specified focus.
 
 ### Step 1: Explore (two parallel sessions)
-1. Report your step:
-   \`\`\`bash
-   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
-     -H "Authorization: Bearer ${managerApiToken}" \\
-     -H "Content-Type: application/json" \\
-     -d '{"step": "exploring"}'
-   \`\`\`
+1. Report step as \`"exploring"\`
 2. Create TWO exploration sessions in parallel on the main branch:
 
    **Code Review session:**
@@ -94,13 +88,7 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 6. Terminate both exploration sessions
 
 ### Step 2: Fix (parallel)
-1. Report your step:
-   \`\`\`bash
-   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
-     -H "Authorization: Bearer ${managerApiToken}" \\
-     -H "Content-Type: application/json" \\
-     -d '{"step": "fixing"}'
-   \`\`\`
+1. Report step as \`"fixing"\`
 2. Create an "issue triage" session on the main branch
 2. Instruct it to: run \`gh issue list --state open\`, group related issues, and report the groupings as structured output
 3. Poll until idle, read its messages to get the issue groupings, then terminate it
@@ -112,47 +100,50 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 6. Read each session's messages to verify work was done, then terminate each
 7. Repeat if any issues remain unaddressed
 
-### Step 3: Test & Merge (parallel)
-1. Report your step:
-   \`\`\`bash
-   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
-     -H "Authorization: Bearer ${managerApiToken}" \\
-     -H "Content-Type: application/json" \\
-     -d '{"step": "testing"}'
-   \`\`\`
-2. For each fix branch:
-   a. Create a test session on that branch
+### Step 3: Code Review, QA & Merge
+
+For each fix branch, run testing in two sequential phases. If either phase finds issues, loop back to fix before retrying. You can process multiple branches in parallel — each branch independently follows the Phase 1 → Phase 2 → Merge pipeline.
+
+1. Report step as \`"testing"\`
+
+2. **Phase 1 — Code Review** (for each fix branch):
+   a. Create a "Code Review: <branch>" session on the fix branch
+   b. Instruct it to:
+      - Review all changes on this branch compared to main (\`git diff main...HEAD\`)
+      - Check for bugs, logic errors, security issues, style problems, and regressions
+      - Run any existing test suites found in the project
+      - Report a clear **PASS** or **FAIL** verdict with a list of specific issues found (if any)
+      - Do NOT make any code changes — this is a review-only session
+   c. Supervise until idle, read results, terminate
+
+3. **If Code Review fails** — loop back to fix: report step as \`"fixing"\`, create a fix session on that branch passing the specific issues found, instruct it to fix, commit, and push (do NOT run tests), supervise until idle, terminate, then go back to Phase 1 (step 2) for this branch.
+
+4. **Phase 2 — QA / Workflow Testing** (only after Code Review passes):
+   a. Create a "QA: <branch>" session on the fix branch
    b. Instruct it to:
       - First, look for any testing skills, documentation, and test scripts in the repo (e.g. \`docs/\`, \`session-skills/\`, CI configs, README) to understand how to build, run, and test the project
       - Use any discovered skills or docs to guide its testing approach (e.g. if the repo has a self-test skill or testing guide, follow it)
-      - Review the changes made on this branch
-      - Run any existing test suites found in the project
-      - If the project is a web application, host a test server and use Playwright MCP to verify the changes work in practice — not just run unit tests
-      - Report results including what passed, what failed, and any issues found
-2. Supervise ALL test sessions using the approval polling loop until complete, read their results
-3. For each completed test, report merging step:
-   \`\`\`bash
-   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
-     -H "Authorization: Bearer ${managerApiToken}" \\
-     -H "Content-Type: application/json" \\
-     -d '{"step": "merging"}'
-   \`\`\`
-   a. If tests pass: create a "merge" session on that branch, instruct it to:
+      - Build and run the application
+      - Host a test server and use Playwright MCP to exercise real user workflows — click through the UI, test forms, navigation, and key features as a real user would
+      - Do NOT just read code or run unit tests — this session MUST interact with the running application via Playwright
+      - Report a clear **PASS** or **FAIL** verdict with a list of specific issues found (if any)
+      - Do NOT make any code changes — this is a testing-only session
+   c. Supervise until idle, read results, terminate
+
+5. **If QA fails** — same as step 3: fix session → fix, commit, push → go back to Phase 1 for this branch. Both code review and QA must pass again.
+
+6. **If both phases pass** — merge:
+   a. Report step as \`"merging"\`
+   b. Create a "Merge: <branch>" session on that branch, instruct it to:
       - Switch to main with \`git checkout main && git pull\`
       - Merge the fix branch with \`git merge <branch>\`
       - Push main with \`git push\`
       - Close the related issues with \`gh issue close <number>\`
       - Delete the branch locally and remotely with \`git branch -d <branch> && git push origin --delete <branch>\`
-   b. If tests fail: create a new fix session to address the failures, then re-test
-   c. Terminate each session when done
-4. Report idle between loops:
-   \`\`\`bash
-   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
-     -H "Authorization: Bearer ${managerApiToken}" \\
-     -H "Content-Type: application/json" \\
-     -d '{"step": "idle"}'
-   \`\`\`
-5. When all branches are merged, go back to Step 1
+   c. Supervise until idle, terminate
+
+7. Report step as \`"idle"\` between loops
+8. When all branches are merged, go back to Step 1
 
 ## How to Supervise Child Sessions
 
@@ -194,10 +185,10 @@ When supervising multiple sessions in parallel, poll each one in the same loop i
 6. Monitor your own token usage — check GET /api/usage periodically. If you believe you cannot complete another full loop, stop gracefully after finishing current work
 7. Read any messages the user sends to you — they may provide guidance, ask you to focus on specific areas, or ask you to stop
 8. When creating child sessions, give them clear, specific instructions in a single comprehensive prompt
-9. Use descriptive session names: "Explore: find bugs", "Fix: branch-auth-improvements", "Test: branch-auth-improvements", "Merge: branch-auth-improvements"
+9. Use descriptive session names: "Explore: find bugs", "Fix: branch-auth-improvements", "Code Review: branch-auth-improvements", "QA: branch-auth-improvements", "Merge: branch-auth-improvements"
 10. The repo URL for all child sessions is: ${repoUrl}
 11. When polling session status, if a session is in "error" or "terminated" state, read its messages to understand what went wrong and decide how to proceed
 12. Run child sessions in parallel when possible (multiple fix sessions, multiple test sessions) for efficiency
 13. Keep a mental log of which issues are addressed by which branches so you can properly close them after merge
-14. When creating exploration or test sessions (NOT fix sessions), always instruct them to check the repo for available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, test scripts, CI configs, README) before starting work — repos may provide guidance on how to build, run, and test the project. Fix sessions should only focus on making code changes, committing, and pushing — testing is handled in Step 3.`;
+14. When creating exploration or QA sessions (NOT fix or code review sessions), always instruct them to check the repo for available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, test scripts, CI configs, README) before starting work — repos may provide guidance on how to build, run, and test the project. Fix sessions should only focus on making code changes, committing, and pushing. Code review sessions should only review code and run test suites — testing via Playwright is handled by QA sessions.`;
 }
