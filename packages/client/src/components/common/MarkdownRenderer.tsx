@@ -9,17 +9,17 @@ export function MarkdownRenderer({ content }: { content: string }) {
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeHighlight]}
       components={{
-        code({ className, children, ...props }) {
+        code({ className, children, node, ...props }) {
           const match = /language-(\w+)/.exec(className || '');
-          const isInline = !match;
-          if (isInline) {
+          const isBlock = match || (node?.position && node.position.start.line !== node.position.end.line);
+          if (!isBlock) {
             return (
               <code className="bg-slate-700/50 px-1.5 py-0.5 rounded text-sm text-blue-300 break-all" {...props}>
                 {children}
               </code>
             );
           }
-          return <CodeBlock language={match![1]} className={className}>{children}</CodeBlock>;
+          return <CodeBlock language={match?.[1]} className={className}>{children}</CodeBlock>;
         },
         p({ children }) {
           return <p className="mb-2 last:mb-0">{children}</p>;
