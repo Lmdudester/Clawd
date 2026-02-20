@@ -377,17 +377,18 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Stop the container
-    await this.containerManager.stopAndRemove(sessionId);
-    session.agentWs = null;
+    // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
     this.updateStatus(session, 'terminated');
+    session.agentWs = null;
+    await this.containerManager.stopAndRemove(sessionId);
   }
 
   async deleteSession(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Stop the container
+    // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
+    session.info.status = 'terminated';
     await this.containerManager.stopAndRemove(sessionId);
     this.sessions.delete(sessionId);
   }
