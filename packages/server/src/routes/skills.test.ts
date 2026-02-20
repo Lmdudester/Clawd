@@ -50,4 +50,52 @@ user-invocable: true
       name: 'Spaced Out',
     });
   });
+
+  it('strips double-quoted values', () => {
+    const content = `---
+name: "My Skill"
+---`;
+    expect(parseFrontmatter(content)).toEqual({
+      name: 'My Skill',
+    });
+  });
+
+  it('strips single-quoted values', () => {
+    const content = `---
+name: 'My Skill'
+---`;
+    expect(parseFrontmatter(content)).toEqual({
+      name: 'My Skill',
+    });
+  });
+
+  it('strips inline comments', () => {
+    const content = `---
+name: Test # this is a comment
+---`;
+    expect(parseFrontmatter(content)).toEqual({
+      name: 'Test',
+    });
+  });
+
+  it('preserves colons inside quoted values', () => {
+    const content = `---
+description: "A guide: for beginners"
+---`;
+    expect(parseFrontmatter(content)).toEqual({
+      description: 'A guide: for beginners',
+    });
+  });
+
+  it('skips blank lines in frontmatter', () => {
+    const content = `---
+name: Test
+
+description: A skill
+---`;
+    expect(parseFrontmatter(content)).toEqual({
+      name: 'Test',
+      description: 'A skill',
+    });
+  });
 });

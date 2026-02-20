@@ -15,9 +15,26 @@ export function parseFrontmatter(content: string): Record<string, string> {
   const result: Record<string, string> = {};
   for (const line of match[1].split('\n')) {
     const idx = line.indexOf(':');
-    if (idx > 0) {
-      result[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    if (!key) continue;
+    let value = line.slice(idx + 1).trim();
+    // Strip inline comments (only when not inside quotes)
+    if (!value.startsWith('"') && !value.startsWith("'")) {
+      const commentIdx = value.indexOf(' #');
+      if (commentIdx >= 0) {
+        value = value.slice(0, commentIdx).trimEnd();
+      }
     }
+    // Strip surrounding quotes
+    if (
+      value.length >= 2 &&
+      ((value[0] === '"' && value[value.length - 1] === '"') ||
+        (value[0] === "'" && value[value.length - 1] === "'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
   }
   return result;
 }
