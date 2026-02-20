@@ -40,13 +40,20 @@ export function parseFrontmatter(content: string): Record<string, string> {
 }
 
 let cachedSkills: SkillInfo[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 30_000; // Re-scan skills directory every 30 seconds
+
+export function invalidateSkillCache(): void {
+  cachedSkills = null;
+  cacheTimestamp = 0;
+}
 
 export function createSkillRoutes(): Router {
   const router = Router();
   router.use(authMiddleware);
 
   router.get('/', async (_req, res) => {
-    if (cachedSkills) {
+    if (cachedSkills && Date.now() - cacheTimestamp < CACHE_TTL_MS) {
       const response: SkillsResponse = { skills: cachedSkills };
       res.json(response);
       return;
@@ -74,6 +81,7 @@ export function createSkillRoutes(): Router {
       }
 
       cachedSkills = skills;
+      cacheTimestamp = Date.now();
       const response: SkillsResponse = { skills };
       res.json(response);
     } catch {
