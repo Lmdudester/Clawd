@@ -13,7 +13,7 @@ function notify() {
 export function useUsage() {
   const [, rerender] = useState(0);
   const [loading, setLoading] = useState(!cachedUsage);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const listener = () => rerender((n) => n + 1);
@@ -23,11 +23,11 @@ export function useUsage() {
 
   const refresh = useCallback(() => {
     setLoading(true);
-    setError(false);
+    setError(null);
     fetchPromise = api.getUsage();
     fetchPromise
       .then((data) => { cachedUsage = data; notify(); })
-      .catch(() => setError(true))
+      .catch(() => setError('Failed to load API usage data'))
       .finally(() => { fetchPromise = null; setLoading(false); });
   }, []);
 
