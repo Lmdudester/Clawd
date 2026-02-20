@@ -18,7 +18,7 @@ git config --global --add safe.directory '*'
 # 2. Clone repo + branch
 if [ -n "$GIT_REPO_URL" ]; then
     echo "[session] Cloning $GIT_REPO_URL (branch: ${GIT_BRANCH:-main})..."
-    git clone --branch "${GIT_BRANCH:-main}" "$GIT_REPO_URL" /workspace
+    git clone --depth 1 --branch "${GIT_BRANCH:-main}" "$GIT_REPO_URL" /workspace
 fi
 cd /workspace
 
