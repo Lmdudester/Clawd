@@ -146,6 +146,16 @@ export function ChatView() {
           {session?.isManager && (
             <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0">Manager</span>
           )}
+          {session?.managerState && (
+            <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0 capitalize">
+              {session.managerState.currentStep}
+            </span>
+          )}
+          {session?.managerState && session.managerState.childSessionIds.length > 0 && (
+            <span className="inline-block text-xs text-slate-400 mr-2 shrink-0">
+              {session.managerState.childSessionIds.length} child{session.managerState.childSessionIds.length !== 1 ? 'ren' : ''}
+            </span>
+          )}
           <h1 className="text-lg font-medium text-white truncate">{session?.name ?? 'Session'}</h1>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
@@ -190,6 +200,13 @@ export function ChatView() {
       {session?.permissionMode === 'plan' && (
         <div key="mode-plan" className={`px-4 py-1.5 ${MODE_THEME.plan.banner} text-xs font-medium text-center shrink-0`}>
           Plan Mode — read-only, edits are disabled
+        </div>
+      )}
+
+      {/* Manager session banner */}
+      {session?.isManager && (
+        <div className="px-4 py-1.5 bg-purple-500/10 border-t border-purple-500/20 text-xs font-medium text-purple-300 text-center shrink-0">
+          Autonomous manager session — messages will guide the orchestration loop
         </div>
       )}
 

@@ -26,40 +26,42 @@ async function main() {
   const masterClient = new MasterClient(MASTER_WS_URL, SESSION_ID!, SESSION_TOKEN!);
   await masterClient.connect();
 
-  // 2. Read .clawd.yml if it exists
+  // 2. Read .clawd.yml if it exists (skip for manager sessions — no repo)
   let config: ClawdConfig | undefined;
-  const configPath = `${WORKSPACE}/.clawd.yml`;
-  if (existsSync(configPath)) {
-    try {
-      const raw = readFileSync(configPath, 'utf-8');
-      config = parseYaml(raw) as ClawdConfig;
-      console.log('[agent] Loaded .clawd.yml');
-    } catch (err: any) {
-      console.warn(`[agent] Failed to parse .clawd.yml: ${err.message}`);
-      masterClient.send({ type: 'setup_progress', message: `Warning: Failed to parse .clawd.yml: ${err.message}` });
-    }
-  }
-
-  // 3. Run setup commands from .clawd.yml
-  if (config?.setup && config.setup.length > 0) {
-    for (const cmd of config.setup) {
-      masterClient.send({ type: 'setup_progress', message: `Running: ${cmd}` });
-      console.log(`[agent] Running setup: ${cmd}`);
+  if (!MANAGER_MODE) {
+    const configPath = `${WORKSPACE}/.clawd.yml`;
+    if (existsSync(configPath)) {
       try {
-        execSync(cmd, {
-          cwd: WORKSPACE,
-          stdio: 'inherit',
-          timeout: 5 * 60 * 1000, // 5 min per command
-        });
+        const raw = readFileSync(configPath, 'utf-8');
+        config = parseYaml(raw) as ClawdConfig;
+        console.log('[agent] Loaded .clawd.yml');
       } catch (err: any) {
-        const errMsg = `Setup command failed: ${cmd} — ${err.message}`;
-        console.error(`[agent] ${errMsg}`);
-        masterClient.send({ type: 'setup_progress', message: errMsg });
-        masterClient.send({ type: 'error', message: errMsg });
-        process.exit(1);
+        console.warn(`[agent] Failed to parse .clawd.yml: ${err.message}`);
+        masterClient.send({ type: 'setup_progress', message: `Warning: Failed to parse .clawd.yml: ${err.message}` });
       }
     }
-    masterClient.send({ type: 'setup_progress', message: 'Setup complete' });
+
+    // 3. Run setup commands from .clawd.yml
+    if (config?.setup && config.setup.length > 0) {
+      for (const cmd of config.setup) {
+        masterClient.send({ type: 'setup_progress', message: `Running: ${cmd}` });
+        console.log(`[agent] Running setup: ${cmd}`);
+        try {
+          execSync(cmd, {
+            cwd: WORKSPACE,
+            stdio: 'inherit',
+            timeout: 5 * 60 * 1000, // 5 min per command
+          });
+        } catch (err: any) {
+          const errMsg = `Setup command failed: ${cmd} — ${err.message}`;
+          console.error(`[agent] ${errMsg}`);
+          masterClient.send({ type: 'setup_progress', message: errMsg });
+          masterClient.send({ type: 'error', message: errMsg });
+          process.exit(1);
+        }
+      }
+      masterClient.send({ type: 'setup_progress', message: 'Setup complete' });
+    }
   }
 
   // 4. Signal ready

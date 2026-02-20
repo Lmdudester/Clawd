@@ -102,6 +102,12 @@ export interface SkillsResponse {
   skills: SkillInfo[];
 }
 
+// Manager state API types
+
+export interface UpdateManagerStepRequest {
+  step: import('./session.js').ManagerStep;
+}
+
 // Usage / Rate Limit types
 
 // Standard API tier bucket (requests, tokens, input-tokens, output-tokens)

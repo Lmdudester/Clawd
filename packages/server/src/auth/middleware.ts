@@ -4,6 +4,7 @@ import { config } from '../config.js';
 
 export interface AuthRequest extends Request {
   user?: { username: string };
+  managerApiToken?: string;
 }
 
 // Optional external validator for manager API tokens.
@@ -26,6 +27,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   // Check manager API tokens first
   if (managerTokenValidator && managerTokenValidator(token)) {
     req.user = { username: 'manager' };
+    req.managerApiToken = token;
     next();
     return;
   }

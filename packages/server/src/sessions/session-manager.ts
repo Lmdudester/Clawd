@@ -10,6 +10,8 @@ import type {
   PermissionMode,
   AgentToMasterMessage,
   MasterToAgentMessage,
+  ManagerState,
+  ManagerStep,
 } from '@clawd/shared';
 import type { CredentialStore } from '../settings/credential-store.js';
 import type { ContainerManager, SessionContainerConfig } from './container-manager.js';
@@ -24,6 +26,7 @@ interface ManagedSession {
   pendingQuestion: PendingQuestion | null;
   managerApiToken: string | null;
   managerContinueTimer: ReturnType<typeof setTimeout> | null;
+  managerState: ManagerState | null;
 }
 
 type SessionEventHandler = (sessionId: string, event: string, data: unknown) => void;
@@ -68,6 +71,10 @@ export class SessionManager {
     const id = uuid();
     const sessionToken = v4();
 
+    const managerState: ManagerState | null = managerMode
+      ? { targetBranch: branch, currentStep: 'idle', childSessionIds: [] }
+      : null;
+
     const info: SessionInfo = {
       id,
       name,
@@ -84,6 +91,7 @@ export class SessionManager {
       notificationsEnabled: false,
       contextUsage: null,
       isManager: managerMode || undefined,
+      managerState: managerState || undefined,
     };
 
     const session: ManagedSession = {
@@ -96,6 +104,7 @@ export class SessionManager {
       pendingQuestion: null,
       managerApiToken: managerMode ? v4() : null,
       managerContinueTimer: null,
+      managerState,
     };
 
     this.sessions.set(id, session);
@@ -145,6 +154,34 @@ export class SessionManager {
       }
     }
     return false;
+  }
+
+  // Find the manager session that owns a given API token
+  findManagerByToken(token: string): string | null {
+    for (const session of this.sessions.values()) {
+      if (session.managerApiToken && session.managerApiToken === token && session.info.status !== 'terminated') {
+        return session.info.id;
+      }
+    }
+    return null;
+  }
+
+  // Link a child session to its parent manager
+  trackChildSession(managerId: string, childId: string): void {
+    const session = this.sessions.get(managerId);
+    if (!session?.managerState) return;
+    session.managerState.childSessionIds.push(childId);
+    session.info.managerState = session.managerState;
+    this.emit(managerId, 'session_update', session.info);
+  }
+
+  // Update the current step for a manager session
+  updateManagerStep(sessionId: string, step: ManagerStep): void {
+    const session = this.sessions.get(sessionId);
+    if (!session?.managerState) return;
+    session.managerState.currentStep = step;
+    session.info.managerState = session.managerState;
+    this.emit(sessionId, 'session_update', session.info);
   }
 
   private async startContainer(session: ManagedSession): Promise<void> {

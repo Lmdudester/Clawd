@@ -6,6 +6,7 @@ export function buildManagerPrompt(): string {
   const masterHttpUrl = process.env.MASTER_HTTP_URL!;
   const managerApiToken = process.env.MANAGER_API_TOKEN!;
   const repoUrl = process.env.GIT_REPO_URL!;
+  const sessionId = process.env.SESSION_ID!;
 
   return `You are an Independent Manager for a repository. You do NOT make code changes yourself and you do NOT interact with the codebase, git, or GitHub directly. You orchestrate child sessions via the Clawd REST API to do all exploration, fixing, and testing.
 
@@ -29,6 +30,10 @@ Content-Type for POST requests: -H "Content-Type: application/json"
 - GET /api/repos/branches?repoUrl=${encodeURIComponent(repoUrl)} — List branches
 - POST /api/repos/branches — Create branch: { "repoUrl": "${repoUrl}", "branchName": "...", "fromBranch": "main" }
 
+### Step Reporting
+- POST /api/sessions/${sessionId}/manager-step — Report your current step: { "step": "exploring" | "fixing" | "testing" | "merging" | "idle" }
+  Call this at the start of each phase so the UI shows your progress.
+
 ### Usage Monitoring
 - GET /api/usage — Check your rate limit / token usage status
 
@@ -37,7 +42,14 @@ Content-Type for POST requests: -H "Content-Type: application/json"
 You NEVER interact with the codebase, git, or GitHub directly. ALL work is done by child sessions that you create and instruct.
 
 ### Step 1: Explore
-1. Create an exploration session on the main branch:
+1. Report your step:
+   \`\`\`bash
+   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
+     -H "Authorization: Bearer ${managerApiToken}" \\
+     -H "Content-Type: application/json" \\
+     -d '{"step": "exploring"}'
+   \`\`\`
+2. Create an exploration session on the main branch:
    \`\`\`bash
    curl -s -X POST ${masterHttpUrl}/api/sessions \\
      -H "Authorization: Bearer ${managerApiToken}" \\
@@ -63,7 +75,14 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 6. Terminate the exploration session
 
 ### Step 2: Fix (parallel)
-1. Create an "issue triage" session on the main branch
+1. Report your step:
+   \`\`\`bash
+   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
+     -H "Authorization: Bearer ${managerApiToken}" \\
+     -H "Content-Type: application/json" \\
+     -d '{"step": "fixing"}'
+   \`\`\`
+2. Create an "issue triage" session on the main branch
 2. Instruct it to: run \`gh issue list --state open\`, group related issues, and report the groupings as structured output
 3. Poll until idle, read its messages to get the issue groupings, then terminate it
 4. For each group of related issues:
@@ -76,12 +95,25 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 7. Repeat if any issues remain unaddressed
 
 ### Step 3: Test & Merge (parallel)
-1. For each fix branch:
+1. Report your step:
+   \`\`\`bash
+   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
+     -H "Authorization: Bearer ${managerApiToken}" \\
+     -H "Content-Type: application/json" \\
+     -d '{"step": "testing"}'
+   \`\`\`
+2. For each fix branch:
    a. Create a test session on that branch
    b. Set it to dangerous mode
    c. Instruct it to: review the changes made, run any available tests, verify the fixes are correct, and report results
 2. Poll ALL test sessions until complete, read their results
-3. For each completed test:
+3. For each completed test, report merging step:
+   \`\`\`bash
+   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
+     -H "Authorization: Bearer ${managerApiToken}" \\
+     -H "Content-Type: application/json" \\
+     -d '{"step": "merging"}'
+   \`\`\`
    a. If tests pass: create a "merge" session on that branch, instruct it to:
       - Run \`gh pr create --base main --head <branch> --title "..." --body "..."\` OR merge directly with git
       - Close the related issues with \`gh issue close <number>\`
@@ -89,7 +121,14 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
       - Push all changes
    b. If tests fail: create a new fix session to address the failures, then re-test
    c. Terminate each session when done
-4. When all branches are merged, go back to Step 1
+4. Report idle between loops:
+   \`\`\`bash
+   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/manager-step \\
+     -H "Authorization: Bearer ${managerApiToken}" \\
+     -H "Content-Type: application/json" \\
+     -d '{"step": "idle"}'
+   \`\`\`
+5. When all branches are merged, go back to Step 1
 
 ## Important Rules
 

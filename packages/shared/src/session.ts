@@ -11,6 +11,14 @@ export type SessionStatus =
   | 'error'
   | 'terminated';
 
+export type ManagerStep = 'idle' | 'exploring' | 'fixing' | 'testing' | 'merging';
+
+export interface ManagerState {
+  targetBranch: string;
+  currentStep: ManagerStep;
+  childSessionIds: string[];
+}
+
 export interface SessionInfo {
   id: string;
   name: string;
@@ -27,6 +35,7 @@ export interface SessionInfo {
   notificationsEnabled: boolean;
   contextUsage: ContextUsage | null;
   isManager?: boolean;
+  managerState?: ManagerState;
 }
 
 export interface SessionMessage {
