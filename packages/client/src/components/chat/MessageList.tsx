@@ -76,7 +76,7 @@ export function MessageList({ messages, streamingText }: Props) {
       {showScrollButton && (
         <button
           onClick={scrollToBottom}
-          className="fixed bottom-24 right-4 w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
+          className="sticky bottom-4 float-right mr-4 w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
         >
           &#8595;
         </button>
