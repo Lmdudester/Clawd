@@ -72,8 +72,7 @@ COPY session-skills/ /home/node/.claude/skills/
 # ── Set up non-root user ─────────────────────────────────────────
 RUN mkdir -p /home/node/.claude /workspace \
     && echo '{"hasCompletedOnboarding":true}' > /home/node/.claude.json \
-    && chown -R node:node /home/node/.claude /home/node/.claude.json /workspace /session-agent \
-    && usermod -aG root node
+    && chown -R node:node /home/node/.claude /home/node/.claude.json /workspace /session-agent
 
 USER node
 ENV HOME=/home/node

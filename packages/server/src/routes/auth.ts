@@ -39,12 +39,17 @@ router.post('/login', loginLimiter, (req, res) => {
 
   const credentials = loadCredentials();
 
-  // Allow env-based test credentials (for automated E2E testing)
+  // Allow env-based test credentials (for automated E2E testing, non-production only)
   if (process.env.CLAWD_TEST_USER && process.env.CLAWD_TEST_PASSWORD) {
-    credentials.users.push({
-      username: process.env.CLAWD_TEST_USER,
-      password: process.env.CLAWD_TEST_PASSWORD,
-    });
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[auth] CLAWD_TEST_USER/CLAWD_TEST_PASSWORD are set but ignored in production');
+    } else {
+      console.warn('[auth] Test credentials are active — do not use in production');
+      credentials.users.push({
+        username: process.env.CLAWD_TEST_USER,
+        password: process.env.CLAWD_TEST_PASSWORD,
+      });
+    }
   }
 
   const user = credentials.users.find(

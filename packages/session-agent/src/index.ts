@@ -41,6 +41,13 @@ async function main() {
 
   // 3. Run setup commands from .clawd.yml
   if (config?.setup && config.setup.length > 0) {
+    // Strip sensitive environment variables to prevent secret exfiltration
+    const sensitivePattern = /SECRET|TOKEN|KEY/i;
+    const sensitiveNames = new Set(['GITHUB_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN', 'SESSION_TOKEN', 'ANTHROPIC_API_KEY']);
+    const filteredEnv = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !sensitiveNames.has(key) && !sensitivePattern.test(key))
+    );
+
     for (const cmd of config.setup) {
       masterClient.send({ type: 'setup_progress', message: `Running: ${cmd}` });
       console.log(`[agent] Running setup: ${cmd}`);
@@ -49,6 +56,7 @@ async function main() {
           cwd: WORKSPACE,
           stdio: 'inherit',
           timeout: 5 * 60 * 1000, // 5 min per command
+          env: filteredEnv,
         });
       } catch (err: any) {
         const errMsg = `Setup command failed: ${cmd} — ${err.message}`;
