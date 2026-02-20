@@ -41,11 +41,23 @@ async function main() {
 
   // 3. Run setup commands from .clawd.yml
   if (config?.setup && config.setup.length > 0) {
-    // Strip sensitive environment variables to prevent secret exfiltration
-    const sensitivePattern = /SECRET|TOKEN|KEY/i;
-    const sensitiveNames = new Set(['GITHUB_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN', 'SESSION_TOKEN', 'ANTHROPIC_API_KEY']);
+    // Strip known sensitive Clawd env vars to prevent secret exfiltration.
+    // Uses an explicit denylist rather than a broad regex so that legitimate
+    // vars like NPM_TOKEN or GPG_KEY are still available to setup commands.
+    const sensitiveNames = new Set([
+      'GITHUB_TOKEN',
+      'CLAUDE_CODE_OAUTH_TOKEN',
+      'SESSION_TOKEN',
+      'ANTHROPIC_API_KEY',
+      'SESSION_AUTH_TOKEN',
+      'GH_TOKEN',
+    ]);
+    const strippedVars = Object.keys(process.env).filter((key) => sensitiveNames.has(key));
+    if (strippedVars.length > 0) {
+      console.log(`[agent] Stripped sensitive env vars from setup environment: ${strippedVars.join(', ')}`);
+    }
     const filteredEnv = Object.fromEntries(
-      Object.entries(process.env).filter(([key]) => !sensitiveNames.has(key) && !sensitivePattern.test(key))
+      Object.entries(process.env).filter(([key]) => !sensitiveNames.has(key))
     );
 
     for (const cmd of config.setup) {
