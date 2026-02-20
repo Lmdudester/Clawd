@@ -391,7 +391,7 @@ export class SessionManager {
     if (!session) return;
 
     // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
-    session.info.status = 'terminated';
+    this.updateStatus(session, 'terminated');
     await this.containerManager.stopAndRemove(sessionId);
     this.sessions.delete(sessionId);
   }
