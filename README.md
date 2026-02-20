@@ -109,9 +109,11 @@ Clawd uses a **master/agent** architecture with per-session Docker containers:
 
    ```bash
    cat > credentials.json << 'EOF'
-   [
-     { "username": "your-username", "password": "your-password" }
-   ]
+   {
+     "users": [
+       { "username": "your-username", "password": "your-password" }
+     ]
+   }
    EOF
    ```
 
@@ -241,7 +243,7 @@ Requires [Node.js 22+](https://nodejs.org/) and npm.
    cp .env.example .env
 
    # Create credentials.json with your login credentials
-   echo '[{"username": "dev", "password": "dev"}]' > credentials.json
+   echo '{"users": [{"username": "dev", "password": "dev"}]}' > credentials.json
    ```
 
 3. **Start the dev servers:**
