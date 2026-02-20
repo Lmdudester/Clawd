@@ -124,7 +124,7 @@ function BashDetail({ input }: { input: Record<string, any> }) {
 function ReadDetail({ input }: { input: Record<string, any> }) {
   const range =
     input.offset || input.limit
-      ? ` (lines ${input.offset ?? 1}${input.limit ? `-${(input.offset ?? 1) + input.limit}` : ''})`
+      ? ` (lines ${input.offset ?? 1}${input.limit ? `-${(input.offset ?? 1) + input.limit - 1}` : ''})`
       : '';
   return (
     <div className="px-3 py-2">

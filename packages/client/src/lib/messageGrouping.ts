@@ -55,7 +55,10 @@ export function groupMessages(messages: SessionMessage[]): Segment[] {
             const prev = planContent.get(filePath) ?? '';
             const oldStr = String(input?.old_string ?? '');
             const newStr = String(input?.new_string ?? '');
-            fullContent = oldStr ? prev.replace(oldStr, newStr) : prev;
+            const replaceAll = Boolean(input?.replace_all);
+            fullContent = oldStr
+              ? (replaceAll ? prev.replaceAll(oldStr, newStr) : prev.replace(oldStr, newStr))
+              : prev;
           }
           planContent.set(filePath, fullContent);
 

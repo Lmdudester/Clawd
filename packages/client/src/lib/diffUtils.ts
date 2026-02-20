@@ -3,10 +3,38 @@ export interface DiffLine {
   line: string;
 }
 
+const MAX_LCS_LINES = 500;
+
+/**
+ * Simple line-by-line diff for large files where the full LCS DP table
+ * would use too much memory. Matches equal lines at the same index,
+ * then marks the rest as adds/deletes.
+ */
+function simpleDiff(oldLines: string[], newLines: string[]): DiffLine[] {
+  const result: DiffLine[] = [];
+  const max = Math.max(oldLines.length, newLines.length);
+  for (let i = 0; i < max; i++) {
+    const oldLine = i < oldLines.length ? oldLines[i] : undefined;
+    const newLine = i < newLines.length ? newLines[i] : undefined;
+    if (oldLine !== undefined && newLine !== undefined && oldLine === newLine) {
+      result.push({ type: 'same', line: oldLine });
+    } else {
+      if (oldLine !== undefined) result.push({ type: 'del', line: oldLine });
+      if (newLine !== undefined) result.push({ type: 'add', line: newLine });
+    }
+  }
+  return result;
+}
+
 export function computeLineDiff(oldText: string, newText: string): DiffLine[] {
   const oldLines = oldText.split('\n');
   const newLines = newText.split('\n');
   const m = oldLines.length, n = newLines.length;
+
+  // Guard against O(n*m) memory for large files
+  if (m > MAX_LCS_LINES && n > MAX_LCS_LINES) {
+    return simpleDiff(oldLines, newLines);
+  }
 
   // LCS table
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));

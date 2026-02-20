@@ -9,6 +9,11 @@
  */
 export function installPlaywrightCompat() {
   document.addEventListener('click', (e) => {
+    // Only intercept programmatic clicks (isTrusted=false) from Playwright's
+    // dispatchEvent. Real user clicks and CDP-simulated input (isTrusted=true)
+    // are already handled by React's own event delegation.
+    if (e.isTrusted) return;
+
     let el = e.target as HTMLElement | null;
     while (el) {
       const reactPropsKey = Object.keys(el).find(k => k.startsWith('__reactProps$'));
