@@ -15,19 +15,25 @@ export class Notifier {
         method: 'POST',
         body,
         headers: {
-          'Title': 'Clawd Update',
+          'Title': title,
           'Tags': 'crab',
         },
+        signal: AbortSignal.timeout(10_000),
       });
 
       if (!res.ok) {
-        console.error(`ntfy: HTTP ${res.status} — ${await res.text()}`);
+        const text = await res.text().catch(() => '(unreadable body)');
+        console.error(`ntfy: HTTP ${res.status} — ${text}`);
         return;
       }
 
       console.log(`ntfy: sent "${title}"`);
     } catch (err: any) {
-      console.error('ntfy: send failed:', err.message);
+      if (err.name === 'TimeoutError') {
+        console.error('ntfy: request timed out after 10s');
+      } else {
+        console.error('ntfy: send failed:', err.message ?? err);
+      }
     }
   }
 }
