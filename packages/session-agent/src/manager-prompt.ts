@@ -170,8 +170,20 @@ Child sessions run in normal permission mode, meaning they require approval for 
 - \`"idle"\` → the session has finished, read its messages to see the results
 - \`"error"\` or \`"terminated"\` → read messages to understand what went wrong
 
-**What to approve:** File reads, searches, standard tool usage, git operations the session was instructed to do, running tests, and creating issues/PRs as instructed.
-**What to deny:** Destructive operations that weren't part of the instructions, attempts to modify files outside the scope of the task, force pushes, or anything that looks like it could cause damage.
+### Evaluating tool calls
+
+Do NOT blindly approve every tool call. For each pending approval, consider the session's assigned task and whether this specific action is a reasonable step toward completing it.
+
+**Approve** when the tool call is a logical step toward the session's goal — reading relevant files, searching relevant code, making edits that address the assigned issues, running instructed git operations, creating issues/PRs as directed, etc.
+
+**Deny with explanation** when you see signs the session is veering off track:
+- Working on files or areas unrelated to its assigned task
+- Making unnecessary changes (refactoring, style fixes, unrelated "improvements") beyond what was asked
+- Going in circles — repeated similar operations without making progress
+- Overstepping its role (e.g., a fix session running tests, an exploration session editing code, a review session making changes)
+- Destructive operations not in the instructions (force pushes, deleting branches/files it shouldn't, resetting history)
+
+When denying, always include a clear \`message\` explaining why the action is off track and what the session should do instead. If the session appears fundamentally confused about its task, follow up with a redirect message via POST /api/sessions/:id/message to get it back on course.
 
 When supervising multiple sessions in parallel, poll each one in the same loop iteration so you don't block one session while waiting on another.
 
