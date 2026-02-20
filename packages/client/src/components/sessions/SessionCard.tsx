@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import type { SessionInfo } from '@clawd/shared';
 import { StatusBadge } from '../common/StatusBadge';
 import { useSessionStore } from '../../stores/sessionStore';
+import { useNotificationStore } from '../../stores/notificationStore';
 import { api } from '../../lib/api';
 import { MODE_THEME } from '../../lib/mode-theme';
 
@@ -13,11 +14,18 @@ function repoShortName(url: string): string {
 export function SessionCard({ session }: { session: SessionInfo }) {
   const navigate = useNavigate();
   const removeSession = useSessionStore((s) => s.removeSession);
+  const addSession = useSessionStore((s) => s.addSession);
+  const addNotification = useNotificationStore((s) => s.addNotification);
 
-  const handleClose = (e: React.MouseEvent) => {
+  const handleClose = async (e: React.MouseEvent) => {
     e.stopPropagation();
     removeSession(session.id);
-    api.deleteSession(session.id).catch(() => {});
+    try {
+      await api.deleteSession(session.id);
+    } catch {
+      addSession(session);
+      addNotification('error', 'Failed to delete session');
+    }
   };
 
   return (
