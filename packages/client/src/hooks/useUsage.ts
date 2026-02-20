@@ -27,7 +27,7 @@ export function useUsage() {
     fetchPromise = api.getUsage();
     fetchPromise
       .then((data) => { cachedUsage = data; notify(); })
-      .catch(() => setError('Failed to load API usage data'))
+      .catch((err) => setError(err.message || 'Failed to load API usage data'))
       .finally(() => { fetchPromise = null; setLoading(false); });
   }, []);
 

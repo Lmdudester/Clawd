@@ -46,6 +46,9 @@ export function LoginPage() {
             onChange={(e) => setUsername(e.target.value)}
             className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
             autoComplete="username"
+            name="username"
+            id="username"
+            aria-label="Username"
           />
 
           <input
@@ -55,6 +58,9 @@ export function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
             autoComplete="current-password"
+            name="password"
+            id="password"
+            aria-label="Password"
           />
 
           <button
