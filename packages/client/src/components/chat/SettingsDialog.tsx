@@ -27,7 +27,7 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
