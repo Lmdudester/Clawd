@@ -143,6 +143,9 @@ export function ChatView() {
           </svg>
         </button>
         <div className="flex-1 min-w-0 flex items-center">
+          {session?.isManager && (
+            <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0">Manager</span>
+          )}
           <h1 className="text-lg font-medium text-white truncate">{session?.name ?? 'Session'}</h1>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">

@@ -25,6 +25,12 @@ export function buildContainerEnv(cfg: SessionContainerConfig): string[] {
     env.push('DOCKER_HOST=unix:///var/run/docker.sock');
   }
 
+  if (cfg.managerMode) {
+    env.push('MANAGER_MODE=true');
+    if (cfg.managerApiToken) env.push(`MANAGER_API_TOKEN=${cfg.managerApiToken}`);
+    env.push(`MASTER_HTTP_URL=http://${config.masterHostname}:${config.port}`);
+  }
+
   return env;
 }
 

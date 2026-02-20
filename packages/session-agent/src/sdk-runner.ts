@@ -13,6 +13,7 @@ import type {
   MasterToAgentMessage,
 } from '@clawd/shared';
 import type { ClawdConfig } from '@clawd/shared';
+import { buildManagerPrompt } from './manager-prompt.js';
 
 const READONLY_TOOLS = new Set([
   'Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch',
@@ -65,6 +66,7 @@ interface SDKRunnerOptions {
   permissionMode: PermissionMode;
   masterClient: MasterClient;
   config?: ClawdConfig;
+  managerMode?: boolean;
 }
 
 export class SDKRunner {
@@ -74,6 +76,7 @@ export class SDKRunner {
   private masterClient: MasterClient;
   private cwd: string;
   private config?: ClawdConfig;
+  private managerMode: boolean;
   private hasAssistantMessage = false;
 
   // Cumulative context tracking
@@ -104,6 +107,7 @@ export class SDKRunner {
     this.permissionMode = options.permissionMode;
     this.masterClient = options.masterClient;
     this.config = options.config;
+    this.managerMode = options.managerMode ?? false;
   }
 
   handleMasterMessage(message: MasterToAgentMessage): void {
@@ -331,15 +335,19 @@ export class SDKRunner {
       }
 
       // Build system prompt
+      const appendText = this.managerMode
+        ? buildManagerPrompt()
+        : [
+            'You are running inside a Clawd session container.',
+            'IMPORTANT: Do not explore or read source files unless the task specifically requires understanding the code.',
+            'This project\'s CLAUDE.md already gives you the architecture and key paths — trust it instead of reading files to orient yourself.',
+            'When a skill provides step-by-step instructions, follow them immediately without any preliminary exploration.',
+          ].join(' ');
+
       const systemPrompt: any = {
         type: 'preset',
         preset: 'claude_code',
-        append: [
-          'You are running inside a Clawd session container.',
-          'IMPORTANT: Do not explore or read source files unless the task specifically requires understanding the code.',
-          'This project\'s CLAUDE.md already gives you the architecture and key paths — trust it instead of reading files to orient yourself.',
-          'When a skill provides step-by-step instructions, follow them immediately without any preliminary exploration.',
-        ].join(' '),
+        append: appendText,
       };
 
       const queryStream = query({

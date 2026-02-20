@@ -14,6 +14,15 @@ export interface CreateSessionRequest {
   repoUrl: string;
   branch: string;
   dockerAccess?: boolean;
+  managerMode?: boolean;
+}
+
+export interface SendMessageRequest {
+  content: string;
+}
+
+export interface SessionMessagesResponse {
+  messages: import('./session.js').SessionMessage[];
 }
 
 export interface SessionListResponse {

@@ -26,7 +26,12 @@ export function SessionCard({ session }: { session: SessionInfo }) {
       className="w-full text-left p-4 bg-blue-950/25 hover:bg-blue-950/40 border border-blue-900/25 rounded-xl transition-colors"
     >
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-lg font-medium text-white truncate">{session.name}</h3>
+        <h3 className="text-lg font-medium text-white truncate">
+          {session.isManager && (
+            <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 align-middle">Manager</span>
+          )}
+          {session.name}
+        </h3>
         <div className="flex items-center gap-2">
           {session.permissionMode === 'plan' && (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-4 h-4 ${MODE_THEME.plan.icon}`} aria-label="Plan mode">

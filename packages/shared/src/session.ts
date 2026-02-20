@@ -26,6 +26,7 @@ export interface SessionInfo {
   model: string | null;
   notificationsEnabled: boolean;
   contextUsage: ContextUsage | null;
+  isManager?: boolean;
 }
 
 export interface SessionMessage {

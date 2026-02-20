@@ -13,6 +13,7 @@ const SESSION_ID = process.env.SESSION_ID;
 const SESSION_TOKEN = process.env.SESSION_TOKEN;
 const MASTER_WS_URL = process.env.MASTER_WS_URL || 'ws://clawd:4000/internal/session';
 const PERMISSION_MODE = (process.env.PERMISSION_MODE || 'normal') as PermissionMode;
+const MANAGER_MODE = process.env.MANAGER_MODE === 'true';
 const WORKSPACE = '/workspace';
 
 if (!SESSION_ID || !SESSION_TOKEN) {
@@ -66,11 +67,16 @@ async function main() {
   console.log('[agent] Ready, starting SDK...');
 
   // 5. Start SDK runner
+  if (MANAGER_MODE) {
+    console.log('[agent] Starting in MANAGER mode');
+  }
+
   const runner = new SDKRunner({
     cwd: WORKSPACE,
     permissionMode: PERMISSION_MODE,
     masterClient,
     config,
+    managerMode: MANAGER_MODE,
   });
 
   // Wire master messages to SDK runner

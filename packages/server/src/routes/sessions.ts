@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware, type AuthRequest } from '../auth/middleware.js';
 import type { SessionManager } from '../sessions/session-manager.js';
-import type { CreateSessionRequest, ErrorResponse } from '@clawd/shared';
+import type { CreateSessionRequest, SendMessageRequest, ErrorResponse } from '@clawd/shared';
 
 export function createSessionRoutes(sessionManager: SessionManager): Router {
   const router = Router();
@@ -15,7 +15,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
 
   // Create a new session
   router.post('/', async (req: AuthRequest, res) => {
-    const { name, repoUrl, branch, dockerAccess } = req.body as CreateSessionRequest;
+    const { name, repoUrl, branch, dockerAccess, managerMode } = req.body as CreateSessionRequest;
 
     if (!name || !repoUrl || !branch) {
       const error: ErrorResponse = { error: 'Name, repoUrl, and branch are required' };
@@ -24,7 +24,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     }
 
     try {
-      const session = await sessionManager.createSession(name, repoUrl, branch, !!dockerAccess);
+      const session = await sessionManager.createSession(name, repoUrl, branch, !!dockerAccess, !!managerMode);
       res.status(201).json({ session });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Failed to create session' });
@@ -43,6 +43,47 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       session: session.info,
       messages: sessionManager.getMessages(req.params.id),
     });
+  });
+
+  // Get session messages
+  router.get('/:id/messages', (req, res) => {
+    const session = sessionManager.getSession(req.params.id);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    res.json({ messages: sessionManager.getMessages(req.params.id) });
+  });
+
+  // Send a message/prompt to a session (used by manager sessions)
+  router.post('/:id/message', (req, res) => {
+    const session = sessionManager.getSession(req.params.id);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    const { content } = req.body as SendMessageRequest;
+    if (!content) {
+      res.status(400).json({ error: 'content is required' });
+      return;
+    }
+
+    sessionManager.sendMessage(req.params.id, content);
+    res.json({ ok: true });
+  });
+
+  // Update session settings (used by manager sessions)
+  router.post('/:id/settings', (req, res) => {
+    const session = sessionManager.getSession(req.params.id);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    sessionManager.updateSessionSettings(req.params.id, req.body);
+    res.json({ ok: true });
   });
 
   // Delete (terminate) session

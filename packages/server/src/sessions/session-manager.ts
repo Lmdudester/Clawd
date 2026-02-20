@@ -22,6 +22,8 @@ interface ManagedSession {
   sessionToken: string;
   pendingApproval: PendingApproval | null;
   pendingQuestion: PendingQuestion | null;
+  managerApiToken: string | null;
+  managerContinueTimer: ReturnType<typeof setTimeout> | null;
 }
 
 type SessionEventHandler = (sessionId: string, event: string, data: unknown) => void;
@@ -62,7 +64,7 @@ export class SessionManager {
     return this.sessions.get(sessionId)?.messages ?? [];
   }
 
-  async createSession(name: string, repoUrl: string, branch: string, dockerAccess = false): Promise<SessionInfo> {
+  async createSession(name: string, repoUrl: string, branch: string, dockerAccess = false, managerMode = false): Promise<SessionInfo> {
     const id = uuid();
     const sessionToken = v4();
 
@@ -77,10 +79,11 @@ export class SessionManager {
       lastMessageAt: null,
       lastMessagePreview: null,
       totalCostUsd: 0,
-      permissionMode: 'normal',
+      permissionMode: managerMode ? 'dangerous' : 'normal',
       model: null,
       notificationsEnabled: false,
       contextUsage: null,
+      isManager: managerMode || undefined,
     };
 
     const session: ManagedSession = {
@@ -91,6 +94,8 @@ export class SessionManager {
       sessionToken,
       pendingApproval: null,
       pendingQuestion: null,
+      managerApiToken: managerMode ? v4() : null,
+      managerContinueTimer: null,
     };
 
     this.sessions.set(id, session);
@@ -132,6 +137,16 @@ export class SessionManager {
     }
   }
 
+  // Validate a manager API token — returns true if any active manager session has this token
+  validateManagerToken(token: string): boolean {
+    for (const session of this.sessions.values()) {
+      if (session.managerApiToken && session.managerApiToken === token && session.info.status !== 'terminated') {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private async startContainer(session: ManagedSession): Promise<void> {
     const claudeDir = this.credentialStore.getSelectedClaudeDir();
     const oauthToken = (await this.credentialStore.ensureFreshToken()) ?? undefined;
@@ -148,6 +163,8 @@ export class SessionManager {
       oauthToken,
       permissionMode: session.info.permissionMode,
       dockerAccess: session.info.dockerAccess,
+      managerMode: !!session.info.isManager,
+      managerApiToken: session.managerApiToken ?? undefined,
     };
 
     const containerId = await this.containerManager.createSessionContainer(containerConfig);
@@ -205,6 +222,12 @@ export class SessionManager {
           content: 'Session container ready',
           timestamp: new Date().toISOString(),
         });
+        // Auto-send initial prompt for manager sessions
+        if (session.info.isManager) {
+          setTimeout(() => {
+            this.sendMessage(sessionId, 'Begin your independent manager loop. Start with Step 1: create an exploration session to find bugs and enhancements in this repository. Track all findings as GitHub issues.');
+          }, 1000);
+        }
         break;
 
       case 'setup_progress':
@@ -233,12 +256,26 @@ export class SessionManager {
         break;
 
       case 'approval_request':
+        // Auto-approve for manager sessions
+        if (session.info.isManager) {
+          console.log(`[session:${sessionId}] Manager auto-approving: ${message.approval.toolName}`);
+          session.pendingApproval = null;
+          this.sendToAgent(sessionId, { type: 'approval_response', approvalId: message.approval.id, allow: true });
+          break;
+        }
         session.pendingApproval = message.approval;
         this.updateStatus(session, 'awaiting_approval');
         this.emit(sessionId, 'approval_request', message.approval);
         break;
 
       case 'question':
+        // Auto-answer for manager sessions — don't block
+        if (session.info.isManager) {
+          console.log(`[session:${sessionId}] Manager auto-answering question`);
+          session.pendingQuestion = null;
+          this.sendToAgent(sessionId, { type: 'question_response', questionId: message.question.id, answers: {} });
+          break;
+        }
         session.pendingQuestion = message.question;
         this.updateStatus(session, 'awaiting_answer');
         this.emit(sessionId, 'question', message.question);
@@ -254,6 +291,10 @@ export class SessionManager {
           isError: message.isError,
           contextUsage: message.contextUsage,
         });
+        // Auto-continue for manager sessions
+        if (session.info.isManager) {
+          this.scheduleManagerContinue(sessionId);
+        }
         break;
 
       case 'status_update':
@@ -391,6 +432,28 @@ export class SessionManager {
     session.info.status = 'terminated';
     await this.containerManager.stopAndRemove(sessionId);
     this.sessions.delete(sessionId);
+  }
+
+  // Auto-continue logic for manager sessions.
+  // When a manager goes idle, ping it after a short delay to keep the loop going.
+  private scheduleManagerContinue(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || !session.info.isManager) return;
+
+    // Clear any existing timer
+    if (session.managerContinueTimer) {
+      clearTimeout(session.managerContinueTimer);
+      session.managerContinueTimer = null;
+    }
+
+    session.managerContinueTimer = setTimeout(() => {
+      session.managerContinueTimer = null;
+      const s = this.sessions.get(sessionId);
+      if (!s || s.info.status !== 'idle' || !s.info.isManager) return;
+
+      console.log(`[session:${sessionId}] Auto-continuing manager session`);
+      this.sendMessage(sessionId, 'Continue your manager loop. Check on child sessions and proceed with the next step.');
+    }, 3000);
   }
 
   private updateStatus(session: ManagedSession, status: SessionStatus): void {

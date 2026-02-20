@@ -20,6 +20,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
   const [isNewBranch, setIsNewBranch] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
   const [dockerAccess, setDockerAccess] = useState(false);
+  const [managerMode, setManagerMode] = useState(false);
 
   const addSession = useSessionStore((s) => s.addSession);
   const navigate = useNavigate();
@@ -104,7 +105,10 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
         });
       }
 
-      const res = await api.createSession({ name, repoUrl, branch: effectiveBranch, dockerAccess });
+      const finalBranch = managerMode
+        ? (selectedRepo !== null ? repos[selectedRepo].defaultBranch : 'main')
+        : effectiveBranch;
+      const res = await api.createSession({ name, repoUrl, branch: finalBranch, dockerAccess, managerMode });
       addSession(res.session);
       navigate(`/session/${res.session.id}`);
       onClose();
@@ -116,6 +120,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
       setIsNewBranch(false);
       setNewBranchName('');
       setDockerAccess(false);
+      setManagerMode(false);
     } catch (err: any) {
       setError(err.message || 'Failed to create session');
     } finally {
@@ -246,6 +251,19 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
             <div>
               <span className="text-sm text-white">Docker access</span>
               <p className="text-xs text-slate-400">Mount Docker socket for container management</p>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={managerMode}
+              onChange={(e) => setManagerMode(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
+            />
+            <div>
+              <span className="text-sm text-white">Independent Manager</span>
+              <p className="text-xs text-slate-400">Autonomous session that orchestrates child sessions to find and fix issues</p>
             </div>
           </label>
 
