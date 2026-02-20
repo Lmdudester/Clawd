@@ -88,6 +88,9 @@ export class SDKRunner {
   private approvalGate: Promise<void> | null = null;
   private interrupted = false;
   private deferredInterrupt = false;
+  private queryTurnInProgress = false;
+  private queryTurnDone: Promise<void> = Promise.resolve();
+  private resolveQueryTurn: (() => void) | null = null;
 
   // Pending approval/question promises
   private pendingApproval: {
@@ -190,7 +193,16 @@ export class SDKRunner {
 
   private sdkSessionId: string | null = null;
 
-  private sendUserMessage(content: string): void {
+  private async sendUserMessage(content: string): Promise<void> {
+    // If a query turn is already in progress, interrupt it and wait for it
+    // to fully complete before starting the next one. This prevents the
+    // abort controller and status flags from getting out of sync when the
+    // user sends messages rapidly.
+    if (this.queryTurnInProgress) {
+      this.interrupt();
+      await this.queryTurnDone;
+    }
+
     this.interrupted = false;
 
     this.masterClient.send({
@@ -205,6 +217,13 @@ export class SDKRunner {
     });
 
     this.hasAssistantMessage = false;
+
+    // Mark a new turn as in-progress and create a promise that resolves
+    // when the SDK emits the 'result' message for this turn.
+    this.queryTurnInProgress = true;
+    this.queryTurnDone = new Promise<void>((resolve) => {
+      this.resolveQueryTurn = resolve;
+    });
 
     this.pushToChannel({
       type: 'user',
@@ -776,6 +795,15 @@ export class SDKRunner {
           isError,
           contextUsage,
         });
+
+        // Signal that this query turn is done so any queued user message
+        // can proceed safely.
+        this.queryTurnInProgress = false;
+        if (this.resolveQueryTurn) {
+          this.resolveQueryTurn();
+          this.resolveQueryTurn = null;
+        }
+
         break;
       }
     }
