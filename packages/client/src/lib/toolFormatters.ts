@@ -58,7 +58,7 @@ function formatFilePath(path: string | undefined, offset?: number, limit?: numbe
   if (offset || limit) {
     const start = offset ?? 1;
     result += `:${start}`;
-    if (limit) result += `-${start + limit}`;
+    if (limit) result += `-${start + limit - 1}`;
   }
   return result;
 }
