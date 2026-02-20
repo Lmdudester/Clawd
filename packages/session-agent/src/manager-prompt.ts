@@ -73,7 +73,8 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 
    **Code Review prompt** — instruct it to:
    - Check the repo for any available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, CI configs) before starting
-   - Thoroughly examine the codebase for bugs, code quality issues, potential improvements, and enhancements
+   - Examine the codebase for bugs, code quality issues, potential improvements, and enhancements
+   - Focus on the most impactful findings — aim for **at most 5 issues**, prioritizing critical bugs and high-value improvements over minor nits
    - Create a GitHub issue for each finding using \`gh issue create --title "..." --body "..." --label "bug"\` or \`--label "enhancement"\`
    - Report a summary of all issues created when done
 
@@ -82,6 +83,7 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
    - Use any discovered skills or docs to guide its testing approach
    - Figure out how to build and run the application
    - Host a test server and use Playwright MCP to exercise real user workflows as a real user would
+   - Focus on the most important user-facing workflows — aim for **at most 5 issues**, prioritizing broken functionality and critical UX problems
    - Create a GitHub issue for each workflow bug or UX issue found using \`gh issue create --title "..." --body "..." --label "bug"\`
    - Run any existing test suites found in the project
    - Report a summary of all issues created when done
