@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --no-warnings --import tsx/esm src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.42",

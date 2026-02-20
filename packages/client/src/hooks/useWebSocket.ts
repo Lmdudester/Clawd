@@ -2,10 +2,8 @@ import { useEffect, useRef, useCallback, createContext, useContext } from 'react
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNotificationStore } from '../stores/notificationStore';
+import { getReconnectDelay } from '../lib/reconnect';
 import type { ClientMessage, ServerMessage } from '@clawd/shared';
-
-const WS_RECONNECT_BASE = 1000;
-const WS_RECONNECT_MAX = 30000;
 
 type SendFn = (message: ClientMessage) => void;
 
@@ -106,10 +104,7 @@ export function useWebSocketProvider(): { send: SendFn } {
 
     ws.onclose = () => {
       wsRef.current = null;
-      const delay = Math.min(
-        WS_RECONNECT_BASE * Math.pow(2, reconnectAttempt.current),
-        WS_RECONNECT_MAX
-      );
+      const delay = getReconnectDelay(reconnectAttempt.current);
       reconnectAttempt.current++;
       reconnectTimer.current = setTimeout(connect, delay);
     };

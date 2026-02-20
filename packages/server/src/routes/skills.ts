@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // session-skills/ lives at the project root, 4 levels up from src/routes/
 const SKILLS_DIR = join(__dirname, '../../../../session-skills');
 
-function parseFrontmatter(content: string): Record<string, string> {
+export function parseFrontmatter(content: string): Record<string, string> {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!match) return {};
   const result: Record<string, string> = {};
