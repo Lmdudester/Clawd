@@ -1,4 +1,4 @@
-import { v4 as uuid, v4 } from 'uuid';
+import { v4 as uuid } from 'uuid';
 import type { WebSocket } from 'ws';
 import type {
   SessionInfo,
@@ -67,7 +67,7 @@ export class SessionManager {
 
   async createSession(name: string, repoUrl: string, branch: string, dockerAccess = false): Promise<SessionInfo> {
     const id = uuid();
-    const sessionToken = v4();
+    const sessionToken = uuid();
 
     const info: SessionInfo = {
       id,
