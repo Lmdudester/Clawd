@@ -9,14 +9,14 @@ services:
       - "4000:4000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /c:/host/c
+      - ${HOST_VOLUME_MOUNT:-./.empty}:${HOST_VOLUME_TARGET:-/host}
       - ./credentials.json:/app/credentials.json:ro
       - ./project-repos.json:/app/project-repos.json
     environment:
       - CLAWD_HOST=0.0.0.0
       - CLAWD_PORT=4000
-      - HOST_DRIVE_PREFIX=/host/c
-      - HOST_CLAUDE_DIR=/host/c/Users/lmdud/.claude
+      - HOST_DRIVE_PREFIX=${HOST_DRIVE_PREFIX:-}
+      - HOST_CLAUDE_DIR=${HOST_CLAUDE_DIR:-}
       - CLAWD_SESSION_IMAGE=clawd-session:latest
       - CLAWD_NETWORK=clawd-network
       - CREDENTIALS_PATH=/app/credentials.json
