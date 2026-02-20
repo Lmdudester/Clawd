@@ -21,6 +21,8 @@ export type ClientMessage =
   | { type: 'approve_tool'; sessionId: string; approvalId: string; allow: boolean; message?: string }
   | { type: 'answer_question'; sessionId: string; questionId: string; answers: Record<string, string> }
   | { type: 'interrupt'; sessionId: string }
+  | { type: 'pause_manager'; sessionId: string }
+  | { type: 'resume_manager'; sessionId: string }
   | { type: 'update_session_settings'; sessionId: string; settings: SessionSettingsUpdate }
   | { type: 'get_models'; sessionId: string }
   | { type: 'set_model'; sessionId: string; model: string };

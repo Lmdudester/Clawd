@@ -430,7 +430,73 @@ export class SessionManager {
     session.pendingApproval = null;
     session.pendingQuestion = null;
 
+    // Clear manager auto-continue timer on interrupt
+    if (session.managerContinueTimer) {
+      clearTimeout(session.managerContinueTimer);
+      session.managerContinueTimer = null;
+    }
+
     this.sendToAgent(sessionId, { type: 'interrupt' });
+  }
+
+  async pauseManager(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session || !session.info.isManager || !session.managerState) return;
+
+    session.managerState.paused = true;
+    session.info.managerState = session.managerState;
+
+    // Clear any pending auto-continue timer
+    if (session.managerContinueTimer) {
+      clearTimeout(session.managerContinueTimer);
+      session.managerContinueTimer = null;
+    }
+
+    // If currently running, interrupt the current turn
+    const { status } = session.info;
+    if (status === 'running' || status === 'awaiting_approval' || status === 'awaiting_answer') {
+      session.pendingApproval = null;
+      session.pendingQuestion = null;
+      this.sendToAgent(sessionId, { type: 'interrupt' });
+    }
+
+    this.emit(sessionId, 'session_update', session.info);
+
+    this.addMessage(session, {
+      id: uuid(),
+      sessionId,
+      type: 'system',
+      content: 'Manager session paused. Auto-continue is suspended.',
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`[session:${sessionId}] Manager paused`);
+  }
+
+  resumeManager(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || !session.info.isManager || !session.managerState) return;
+    if (!session.managerState.paused) return;
+
+    session.managerState.paused = false;
+    session.info.managerState = session.managerState;
+
+    this.emit(sessionId, 'session_update', session.info);
+
+    this.addMessage(session, {
+      id: uuid(),
+      sessionId,
+      type: 'system',
+      content: 'Manager session resumed. Auto-continue is active.',
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`[session:${sessionId}] Manager resumed`);
+
+    // If idle, restart the auto-continue loop immediately
+    if (session.info.status === 'idle') {
+      this.scheduleManagerContinue(sessionId);
+    }
   }
 
   async getSupportedModels(sessionId: string): Promise<void> {
@@ -470,6 +536,12 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
+    // Clear auto-continue timer
+    if (session.managerContinueTimer) {
+      clearTimeout(session.managerContinueTimer);
+      session.managerContinueTimer = null;
+    }
+
     // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
     this.updateStatus(session, 'terminated');
     session.agentWs = null;
@@ -492,6 +564,9 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session || !session.info.isManager) return;
 
+    // Do not schedule if paused
+    if (session.managerState?.paused) return;
+
     // Clear any existing timer
     if (session.managerContinueTimer) {
       clearTimeout(session.managerContinueTimer);
@@ -502,6 +577,9 @@ export class SessionManager {
       session.managerContinueTimer = null;
       const s = this.sessions.get(sessionId);
       if (!s || s.info.status !== 'idle' || !s.info.isManager) return;
+
+      // Double-check paused state inside the timer callback
+      if (s.managerState?.paused) return;
 
       const prefs = s.managerState?.preferences;
       const focusReminder = prefs

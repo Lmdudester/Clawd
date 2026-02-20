@@ -80,6 +80,11 @@ export function SessionCard({ session }: { session: SessionInfo }) {
               {session.managerState.childSessionIds.length} child session{session.managerState.childSessionIds.length !== 1 ? 's' : ''}
             </span>
           )}
+          {session.managerState.paused && (
+            <span className="text-xs font-semibold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded">
+              Paused
+            </span>
+          )}
         </div>
       )}
       {session.lastMessagePreview && (

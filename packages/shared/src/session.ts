@@ -25,6 +25,7 @@ export interface ManagerState {
   currentStep: ManagerStep;
   childSessionIds: string[];
   preferences?: ManagerPreferences;
+  paused?: boolean;
 }
 
 export interface SessionInfo {
