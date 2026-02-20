@@ -36,6 +36,8 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
 
   if (!open) return null;
 
+  const isErrored = session.status === 'error';
+
   function handleNameCommit() {
     const trimmed = name.trim();
     if (trimmed && trimmed !== session.name) {
@@ -123,12 +125,13 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
                 <button
                   key={mode.value}
                   onClick={() => onUpdateSettings({ permissionMode: mode.value })}
-                  title={mode.description}
+                  disabled={isErrored}
+                  title={isErrored ? 'Cannot change settings on an errored session' : mode.description}
                   className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
                     session.permissionMode === mode.value
                       ? MODE_THEME[mode.value].toggle
                       : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
+                  } ${isErrored ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {mode.label}
                 </button>
@@ -141,11 +144,13 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
             <label className="block text-sm font-medium text-slate-400 mb-1.5">Notifications</label>
             <button
               onClick={() => onUpdateSettings({ notificationsEnabled: !session.notificationsEnabled })}
+              disabled={isErrored}
+              title={isErrored ? 'Cannot change settings on an errored session' : undefined}
               className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 session.notificationsEnabled
                   ? 'bg-green-600 text-white hover:bg-green-700'
                   : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
+              } ${isErrored ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {session.notificationsEnabled ? 'Enabled' : 'Disabled'}
             </button>
