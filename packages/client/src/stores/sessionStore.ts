@@ -60,9 +60,21 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }),
 
   removeSession: (id) =>
-    set((state) => ({
-      sessions: state.sessions.filter((s) => s.id !== id),
-    })),
+    set((state) => {
+      const messages = new Map(state.messages);
+      messages.delete(id);
+      const streamingTokens = new Map(state.streamingTokens);
+      for (const key of streamingTokens.keys()) {
+        if (key.startsWith(`${id}:`)) {
+          streamingTokens.delete(key);
+        }
+      }
+      return {
+        sessions: state.sessions.filter((s) => s.id !== id),
+        messages,
+        streamingTokens,
+      };
+    }),
 
   setCurrentSession: (id) => set({ currentSessionId: id }),
 

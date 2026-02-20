@@ -25,8 +25,9 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, c
       case 'session_update': {
         connectionManager.broadcastAll({ type: 'session_update', session: data });
         // Cancel pending result push if session starts running again (intermediate result)
+        // or if session is terminated/deleted
         const status = (data as any).status;
-        if (status === 'running' && pendingResultPush.has(sessionId)) {
+        if ((status === 'running' || status === 'terminated') && pendingResultPush.has(sessionId)) {
           clearTimeout(pendingResultPush.get(sessionId));
           pendingResultPush.delete(sessionId);
         }
