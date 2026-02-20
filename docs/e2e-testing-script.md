@@ -104,15 +104,15 @@
 | 1 | `browser_snapshot` | Shows "No sessions yet" empty state message. FAB (+) button is visible. Settings and Logout buttons in header |
 
 #### LIST-02 — Usage Card Display
-**Preconditions:** Logged in, on Session List page.
+**Preconditions:** Logged in, on Session List page. Instance has OAuth authentication configured (not auth method `none`).
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | `browser_snapshot` — look for the Usage Card | Usage card section is present (may show "Loading usage..." initially, then either usage data with progress bars OR an error state with retry button) |
+| 1 | `browser_snapshot` — look for the Usage Card | If auth method is `none` or no usage data is available, the Usage Card is **not rendered** — this is expected. If OAuth is configured, the card appears (may show "Loading usage..." initially, then either usage data with progress bars OR an error state with retry button) |
 | 2 | If usage data loaded: verify progress bars and reset times are displayed | Color-coded bars visible (green/yellow/red based on utilization) |
-| 3 | If error state: click Refresh/Retry button | Retries the usage fetch |
+| 3 | If error state: click Retry button | Retries the usage fetch |
 
-**Note:** The test instance may not have valid API credentials, so an error state on the Usage Card is acceptable. The test verifies the card renders and handles errors gracefully.
+**Note:** The test instance typically has no valid API credentials (auth method `none`), so the Usage Card will not appear. This test case only applies to instances with OAuth configured. If the card is absent, skip this test.
 
 ---
 
@@ -124,10 +124,11 @@
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Click the FAB (+) button | New Session dialog opens with fields: name, repo URL, branch |
-| 2 | `browser_snapshot` | Dialog visible. Since no project-repos.json, shows raw URL + branch text inputs (no dropdown) |
-| 3 | Fill: name = `Test Session 1`, repo URL = `https://github.com/octocat/Hello-World`, branch = `master` | Fields populated |
-| 4 | Click Create | Dialog closes. Browser navigates to `/session/{id}`. Chat view loads with header showing "Test Session 1", repo badge "Hello-World", branch badge "master" |
-| 5 | `browser_snapshot` | Status badge shows `starting` then transitions to `idle`. Empty message area with "Send a message to get started" |
+| 2 | `browser_snapshot` | Dialog visible. Since no project-repos.json, shows raw URL input and branch text input (no repo dropdown) |
+| 3 | Fill: name = `Test Session 1`, repo URL = `https://github.com/octocat/Hello-World`, then click out of the URL field | After leaving the URL field, branches are fetched and the branch field changes from a text input to a dropdown (`<select>`) listing available branches, plus a "Create New Branch..." option |
+| 4 | Select `master` from the branch dropdown | Branch selected |
+| 5 | Click Create | Dialog closes. Browser navigates to `/session/{id}`. Chat view loads with header showing "Test Session 1", repo badge "Hello-World", branch badge "master" |
+| 6 | `browser_snapshot` | Status badge shows `starting` then transitions to `idle`. Empty message area with "Send a message to get started" |
 
 #### SESS-02 — Create Session (with Docker Access)
 **Preconditions:** Logged in, on Session List page.
@@ -135,8 +136,9 @@
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Click FAB (+) | Dialog opens |
-| 2 | Fill: name = `Docker Session`, repo URL = `https://github.com/octocat/Hello-World`, branch = `master`, check Docker access checkbox | Fields populated, checkbox checked |
-| 3 | Click Create | Session created and navigates to chat view |
+| 2 | Fill: name = `Docker Session`, repo URL = `https://github.com/octocat/Hello-World`, then click out of the URL field | Branch field changes from text input to dropdown after branches are fetched |
+| 3 | Select `master` from the branch dropdown, check Docker access checkbox | Branch selected, checkbox checked |
+| 4 | Click Create | Session created and navigates to chat view |
 
 > **SAFETY S2:** Do NOT use this Docker-enabled session to run `/self-test`, `/e2e-test`, or `test-clawd.sh`. This would create a recursive Clawd instance.
 
@@ -308,7 +310,7 @@
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | `browser_snapshot` — check model dropdown | Dropdown shows current model. May show "Loading models..." initially |
-| 2 | Select a different model from the dropdown | Model changes. A system message may appear in chat: "Model changed to {model}" |
+| 2 | Select a different model from the dropdown | Model changes. A system message appears in chat: "Model changed to default" (the message always shows the SDK model key such as "default", "sonnet", or "haiku" — not the full model display name) |
 
 #### SETT-05 — Toggle Notifications
 **Preconditions:** Settings dialog open.
@@ -358,8 +360,8 @@
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Click the message input textarea | Input focused |
-| 2 | Type `/` | Skill picker dropdown appears above the textarea showing available skills (e.g., "wrapup", "self-test") |
-| 3 | `browser_snapshot` | Dropdown visible with skill names and descriptions, lightning bolt icons |
+| 2 | Type `/` (a single forward slash character) in the message input | Skill picker dropdown appears above the textarea showing available skills (e.g., "wrapup", "self-test"). The picker is triggered by typing `/` at the start of the input with no spaces |
+| 3 | `browser_snapshot` | Dropdown visible with skill names shown as `/{name}`, lightning bolt icons, and descriptions |
 
 #### SKILL-02 — Select a Skill
 **Preconditions:** Skill picker visible.
@@ -383,13 +385,13 @@
 
 ### Suite 10: Session Management
 
-#### MGMT-01 — Delete a Session
+#### MGMT-01 — Close a Session
 **Preconditions:** At least one session exists, on Session List page.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | `browser_snapshot` | Session card(s) visible with delete button |
-| 2 | Click the delete button on a session card | Session is removed from the list. If it was the only session, empty state appears |
+| 1 | `browser_snapshot` | Session card(s) visible with Close session button (X icon) |
+| 2 | Click the Close session button (X icon) on a session card | Session is closed and its card is removed from the list. If it was the only session, empty state appears |
 
 #### MGMT-02 — Session Status Transitions
 **Preconditions:** A newly created session.
@@ -513,13 +515,14 @@
 | 2 | Observe badge during `running` state | Animated pulse on the status dot |
 | 3 | Observe badge during `idle` state | Static dot, no animation |
 
-#### UI-04 — Toast Notifications
-**Preconditions:** Trigger an action that produces a toast (e.g., an error).
+#### UI-04 — Error Feedback
+**Preconditions:** Session list page visible.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | `browser_snapshot` when a toast appears | Toast visible in top-right corner with appropriate color (red for error, green for success) and dismiss button |
-| 2 | Click dismiss button | Toast disappears |
+| 1 | Errors in Clawd are handled contextually within components rather than via prominent toast notifications. For example, a failed session close will revert the optimistic removal and show inline feedback | Verify that error states are handled gracefully in the components where they occur (e.g., session card restored after failed close, usage card showing retry button on fetch failure) |
+
+**Note:** There is no general-purpose toast notification system surfaced in normal user flows. Error handling is contextual and component-level.
 
 ---
 
@@ -527,7 +530,7 @@
 
 **Always run these steps at the end of every testing session, even if tests failed.**
 
-1. Navigate to Session List in the test instance and delete all sessions
+1. Navigate to Session List in the test instance and close all sessions (click the X button on each card)
 2. Close the Playwright browser:
    ```
    browser_close
