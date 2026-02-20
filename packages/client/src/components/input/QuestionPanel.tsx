@@ -14,19 +14,22 @@ export function QuestionPanel({ question, onAnswer, onInterrupt }: Props) {
   const handleSelect = (questionText: string, label: string, multiSelect: boolean) => {
     setAnswers((prev) => {
       if (multiSelect) {
-        const current = prev[questionText]?.split(', ').filter(Boolean) ?? [];
+        const current = prev[questionText]?.split('\0').filter(Boolean) ?? [];
         const updated = current.includes(label)
           ? current.filter((l) => l !== label)
           : [...current, label];
-        return { ...prev, [questionText]: updated.join(', ') };
+        return { ...prev, [questionText]: updated.join('\0') };
       }
       return { ...prev, [questionText]: label };
     });
   };
 
   const handleSubmit = () => {
-    // Merge custom inputs
-    const merged = { ...answers };
+    // Convert internal delimiter to comma-separated for the API
+    const merged: Record<string, string> = {};
+    for (const [key, value] of Object.entries(answers)) {
+      merged[key] = value.includes('\0') ? value.split('\0').filter(Boolean).join(', ') : value;
+    }
     for (const [key, value] of Object.entries(customInputs)) {
       if (value.trim()) merged[key] = value.trim();
     }
@@ -41,7 +44,7 @@ export function QuestionPanel({ question, onAnswer, onInterrupt }: Props) {
           <div className="flex flex-wrap gap-2">
             {q.options.map((opt) => {
               const selected = q.multiSelect
-                ? answers[q.question]?.split(', ').includes(opt.label)
+                ? answers[q.question]?.split('\0').includes(opt.label)
                 : answers[q.question] === opt.label;
               return (
                 <button
