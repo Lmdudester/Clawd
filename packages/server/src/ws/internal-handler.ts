@@ -12,6 +12,14 @@ export function setupInternalWebSocket(sessionManager: SessionManager): WebSocke
     console.log('[internal-ws] Agent connected');
     let authenticatedSessionId: string | null = null;
 
+    // Close connection if agent doesn't authenticate within 30 seconds
+    const authTimeout = setTimeout(() => {
+      if (!authenticatedSessionId) {
+        console.warn('[internal-ws] Auth timeout, closing unauthenticated connection');
+        ws.close(4002, 'Authentication timeout');
+      }
+    }, 30_000);
+
     ws.on('message', (data) => {
       let message: AgentToMasterMessage;
       try {
@@ -25,6 +33,7 @@ export function setupInternalWebSocket(sessionManager: SessionManager): WebSocke
       if (message.type === 'auth') {
         const valid = sessionManager.authenticateAgent(message.sessionId, message.token);
         if (valid) {
+          clearTimeout(authTimeout);
           authenticatedSessionId = message.sessionId;
           sessionManager.registerAgentConnection(message.sessionId, ws);
           ws.send(JSON.stringify({ type: 'auth_ok' }));
@@ -47,6 +56,7 @@ export function setupInternalWebSocket(sessionManager: SessionManager): WebSocke
     });
 
     ws.on('close', () => {
+      clearTimeout(authTimeout);
       if (authenticatedSessionId) {
         console.log(`[internal-ws] Agent disconnected for session ${authenticatedSessionId}`);
         sessionManager.unregisterAgentConnection(authenticatedSessionId);
