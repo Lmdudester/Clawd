@@ -11,6 +11,7 @@ export function ProjectFolderSettings() {
   const [newUrl, setNewUrl] = useState('');
   const [newBranch, setNewBranch] = useState('main');
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
 
   useEffect(() => {
     api.getProjectRepos()
@@ -109,14 +110,32 @@ export function ProjectFolderSettings() {
                 <span className="text-xs text-slate-500 ml-2">({repo.defaultBranch})</span>
               </div>
 
-              <button
-                onClick={() => handleDelete(i)}
-                disabled={saving}
-                className="flex-shrink-0 text-slate-500 hover:text-red-400 disabled:opacity-50 transition-colors text-lg"
-                title="Remove repo"
-              >
-                &times;
-              </button>
+              {pendingDeleteIndex === i ? (
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => { handleDelete(i); setPendingDeleteIndex(null); }}
+                    disabled={saving}
+                    className="px-2 py-0.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50 transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setPendingDeleteIndex(null)}
+                    className="px-2 py-0.5 text-xs bg-slate-600 hover:bg-slate-500 text-slate-300 rounded transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setPendingDeleteIndex(i)}
+                  disabled={saving}
+                  className="flex-shrink-0 text-slate-500 hover:text-red-400 disabled:opacity-50 transition-colors text-lg"
+                  title="Remove repo"
+                >
+                  &times;
+                </button>
+              )}
             </div>
           ))}
         </div>
