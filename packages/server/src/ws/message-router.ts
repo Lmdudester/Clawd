@@ -10,6 +10,15 @@ export class MessageRouter {
     private connectionManager: ConnectionManager
   ) {}
 
+  /** Check if the WebSocket user owns the given session. */
+  private isSessionOwner(ws: WebSocket, sessionId: string): boolean {
+    const username = this.connectionManager.getUsername(ws);
+    if (!username) return false;
+    const session = this.sessionManager.getSession(sessionId);
+    if (!session) return false;
+    return session.info.createdBy === username;
+  }
+
   handleMessage(ws: WebSocket, raw: string): void {
     let message: ClientMessage;
     try {
@@ -82,10 +91,18 @@ export class MessageRouter {
         break;
 
       case 'send_prompt':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.sessionManager.sendMessage(message.sessionId, message.content);
         break;
 
       case 'approve_tool':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.sessionManager.approveToolUse(
           message.sessionId,
           message.approvalId,
@@ -95,6 +112,10 @@ export class MessageRouter {
         break;
 
       case 'answer_question':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.sessionManager.answerQuestion(
           message.sessionId,
           message.questionId,
@@ -103,30 +124,54 @@ export class MessageRouter {
         break;
 
       case 'interrupt':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.sessionManager.interruptSession(message.sessionId).catch((err) => {
           console.error(`WS: interrupt error for session ${message.sessionId}:`, err);
         });
         break;
 
       case 'pause_manager':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.sessionManager.pauseManager(message.sessionId).catch((err) => {
           console.error(`WS: pause_manager error for session ${message.sessionId}:`, err);
         });
         break;
 
       case 'resume_manager':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.sessionManager.resumeManager(message.sessionId);
         break;
 
       case 'update_session_settings':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.sessionManager.updateSessionSettings(message.sessionId, message.settings);
         break;
 
       case 'get_models':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.sessionManager.getSupportedModels(message.sessionId);
         break;
 
       case 'set_model':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.sessionManager.setModel(message.sessionId, message.model);
         break;
     }

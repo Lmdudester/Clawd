@@ -36,6 +36,7 @@ export interface SessionInfo {
   dockerAccess: boolean;
   status: SessionStatus;
   createdAt: string;
+  createdBy: string;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
   totalCostUsd: number;

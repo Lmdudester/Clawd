@@ -58,4 +58,8 @@ export class ConnectionManager {
   isAuthenticated(ws: WebSocket): boolean {
     return this.clients.has(ws);
   }
+
+  getUsername(ws: WebSocket): string | null {
+    return this.clients.get(ws)?.username ?? null;
+  }
 }

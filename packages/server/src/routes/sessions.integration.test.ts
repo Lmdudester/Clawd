@@ -21,7 +21,7 @@ function createMockSessionManager() {
     getSession: vi.fn((id: string) => {
       if (id === 's1') {
         return {
-          info: { id: 's1', name: 'Session 1', status: 'idle' },
+          info: { id: 's1', name: 'Session 1', status: 'idle', createdBy: 'testuser' },
           pendingApproval: null,
           pendingQuestion: null,
         };
@@ -110,7 +110,7 @@ describe('session routes', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.session.name).toBe('New Session');
-    expect(sm.createSession).toHaveBeenCalledWith('New Session', 'https://github.com/test/repo', 'main', false, false);
+    expect(sm.createSession).toHaveBeenCalledWith('New Session', 'https://github.com/test/repo', 'main', false, false, 'testuser');
   });
 
   it('POST /api/sessions returns 400 without name', async () => {

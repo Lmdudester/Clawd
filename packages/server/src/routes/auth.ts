@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 import rateLimit from 'express-rate-limit';
 import { config } from '../config.js';
 import type { LoginRequest, LoginResponse, ErrorResponse } from '@clawd/shared';
@@ -15,6 +16,8 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts, please try again later' },
 });
 
+const BCRYPT_ROUNDS = 10;
+
 interface Credentials {
   users: Array<{ username: string; password: string }>;
 }
@@ -26,6 +29,28 @@ function loadCredentials(): Credentials {
   } catch {
     return { users: [] };
   }
+}
+
+function saveCredentials(credentials: Credentials): void {
+  try {
+    writeFileSync(config.credentialsPath, JSON.stringify(credentials, null, 2));
+  } catch (err) {
+    console.error('[auth] Failed to save credentials file:', err);
+  }
+}
+
+/** Check if a stored password is a bcrypt hash. */
+function isBcryptHash(password: string): boolean {
+  return /^\$2[aby]?\$/.test(password);
+}
+
+/** Verify a password against a stored value (bcrypt hash or plaintext for migration). */
+function verifyPassword(inputPassword: string, storedPassword: string): boolean {
+  if (isBcryptHash(storedPassword)) {
+    return bcrypt.compareSync(inputPassword, storedPassword);
+  }
+  // Plaintext fallback for migration
+  return inputPassword === storedPassword;
 }
 
 router.post('/login', loginLimiter, (req, res) => {
@@ -53,13 +78,24 @@ router.post('/login', loginLimiter, (req, res) => {
   }
 
   const user = credentials.users.find(
-    (u) => u.username === username && u.password === password
+    (u) => u.username === username && verifyPassword(password, u.password)
   );
 
   if (!user) {
     const error: ErrorResponse = { error: 'Invalid credentials' };
     res.status(401).json(error);
     return;
+  }
+
+  // Auto-migrate plaintext passwords to bcrypt hashes on successful login
+  if (!isBcryptHash(user.password)) {
+    console.log(`[auth] Migrating plaintext password to bcrypt for user "${username}"`);
+    const persistedCredentials = loadCredentials();
+    const persistedUser = persistedCredentials.users.find((u) => u.username === username);
+    if (persistedUser) {
+      persistedUser.password = bcrypt.hashSync(password, BCRYPT_ROUNDS);
+      saveCredentials(persistedCredentials);
+    }
   }
 
   const token = jwt.sign({ username: user.username }, config.jwtSecret, {

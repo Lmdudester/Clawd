@@ -21,7 +21,7 @@ function createMockSessionManager() {
   return {
     getSessions: vi.fn(() => []),
     getSession: vi.fn((id: string) => ({
-      info: { id, name: 'Test', status: 'idle' },
+      info: { id, name: 'Test', status: 'idle', createdBy: 'alice' },
       pendingApproval: null,
       pendingQuestion: null,
     })),

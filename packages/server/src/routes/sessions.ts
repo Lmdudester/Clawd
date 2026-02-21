@@ -3,6 +3,13 @@ import { authMiddleware, type AuthRequest } from '../auth/middleware.js';
 import type { SessionManager } from '../sessions/session-manager.js';
 import type { CreateSessionRequest, SendMessageRequest, UpdateManagerStepRequest, ErrorResponse, ManagerStep } from '@clawd/shared';
 
+/** Check if the authenticated user owns the session (or is a manager API token). */
+function isSessionOwner(req: AuthRequest, sessionCreatedBy: string): boolean {
+  // Manager API tokens are authorized for sessions they manage
+  if (req.managerApiToken) return true;
+  return req.user?.username === sessionCreatedBy;
+}
+
 export function createSessionRoutes(sessionManager: SessionManager): Router {
   const router = Router();
   router.use(authMiddleware);
@@ -24,7 +31,8 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     }
 
     try {
-      const session = await sessionManager.createSession(name, repoUrl, branch, !!dockerAccess, !!managerMode);
+      const createdBy = req.user?.username ?? 'unknown';
+      const session = await sessionManager.createSession(name, repoUrl, branch, !!dockerAccess, !!managerMode, createdBy);
 
       // Auto-link child to parent manager if created via manager API token
       if (req.managerApiToken) {
@@ -68,10 +76,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Send a message/prompt to a session (used by manager sessions)
-  router.post('/:id/message', (req, res) => {
+  router.post('/:id/message', (req: AuthRequest, res) => {
     const session = sessionManager.getSession(req.params.id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session.info.createdBy)) {
+      res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
 
@@ -86,10 +98,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Update session settings (used by manager sessions)
-  router.post('/:id/settings', (req, res) => {
+  router.post('/:id/settings', (req: AuthRequest, res) => {
     const session = sessionManager.getSession(req.params.id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session.info.createdBy)) {
+      res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
 
@@ -98,10 +114,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Update manager step
-  router.post('/:id/manager-step', (req, res) => {
+  router.post('/:id/manager-step', (req: AuthRequest, res) => {
     const session = sessionManager.getSession(req.params.id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session.info.createdBy)) {
+      res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
     if (!session.info.isManager) {
@@ -121,10 +141,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Approve or deny a pending tool call
-  router.post('/:id/approve', (req, res) => {
+  router.post('/:id/approve', (req: AuthRequest, res) => {
     const session = sessionManager.getSession(req.params.id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session.info.createdBy)) {
+      res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
 
@@ -139,10 +163,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Delete (terminate) session
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', async (req: AuthRequest, res) => {
     const session = sessionManager.getSession(req.params.id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session.info.createdBy)) {
+      res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
 

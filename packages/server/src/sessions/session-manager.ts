@@ -78,7 +78,7 @@ export class SessionManager {
     return this.sessions.get(sessionId)?.messages ?? [];
   }
 
-  async createSession(name: string, repoUrl: string, branch: string, dockerAccess = false, managerMode = false): Promise<SessionInfo> {
+  async createSession(name: string, repoUrl: string, branch: string, dockerAccess = false, managerMode = false, createdBy = 'unknown'): Promise<SessionInfo> {
     // Enforce maximum session limit to prevent unbounded container creation
     if (config.maxSessions > 0) {
       const activeSessions = Array.from(this.sessions.values()).filter(
@@ -104,6 +104,7 @@ export class SessionManager {
       dockerAccess,
       status: 'starting',
       createdAt: new Date().toISOString(),
+      createdBy,
       lastMessageAt: null,
       lastMessagePreview: null,
       totalCostUsd: 0,

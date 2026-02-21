@@ -43,9 +43,22 @@ const READONLY_BASH_PATTERNS = [
 export function isReadOnlyBash(toolName: string, input: Record<string, unknown>): boolean {
   if (toolName !== 'Bash') return false;
   const cmd = (typeof input.command === 'string' ? input.command : '').trim();
-  // Reject gh api with --method that isn't GET
-  if (/^gh\s+api\s/.test(cmd) && /--method\s+(?!GET\b)/i.test(cmd)) return false;
-  return READONLY_BASH_PATTERNS.some(p => p.test(cmd));
+  if (!cmd) return false;
+
+  // Split on shell operators (|, ||, &&, ;, $(...), backticks, newlines) and check each sub-command.
+  // If any sub-command is not in the read-only list, the entire command is not read-only.
+  const subCommands = cmd.split(/\|{1,2}|&&|;|\n/).map(s => s.trim()).filter(Boolean);
+
+  // Also reject commands containing subshell/command-substitution patterns
+  if (/\$\(|`/.test(cmd)) return false;
+
+  for (const sub of subCommands) {
+    // Reject gh api with --method that isn't GET
+    if (/^gh\s+api\s/.test(sub) && /--method\s+(?!GET\b)/i.test(sub)) return false;
+    if (!READONLY_BASH_PATTERNS.some(p => p.test(sub))) return false;
+  }
+
+  return true;
 }
 
 export function getEditFilePath(toolName: string, input: Record<string, unknown>): string | null {
