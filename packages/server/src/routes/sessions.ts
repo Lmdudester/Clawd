@@ -51,7 +51,8 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
 
   // Get session details
   router.get('/:id', (req, res) => {
-    const session = sessionManager.getSession(req.params.id);
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -59,25 +60,27 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
 
     res.json({
       session: session.info,
-      messages: sessionManager.getMessages(req.params.id),
+      messages: sessionManager.getMessages(id),
       pendingApproval: session.pendingApproval ?? null,
     });
   });
 
   // Get session messages
   router.get('/:id/messages', (req, res) => {
-    const session = sessionManager.getSession(req.params.id);
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
 
-    res.json({ messages: sessionManager.getMessages(req.params.id) });
+    res.json({ messages: sessionManager.getMessages(id) });
   });
 
   // Send a message/prompt to a session (used by manager sessions)
   router.post('/:id/message', (req: AuthRequest, res) => {
-    const session = sessionManager.getSession(req.params.id);
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -93,13 +96,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       return;
     }
 
-    sessionManager.sendMessage(req.params.id, content);
+    sessionManager.sendMessage(id, content);
     res.json({ ok: true });
   });
 
   // Update session settings (used by manager sessions)
   router.post('/:id/settings', (req: AuthRequest, res) => {
-    const session = sessionManager.getSession(req.params.id);
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -109,13 +113,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       return;
     }
 
-    sessionManager.updateSessionSettings(req.params.id, req.body);
+    sessionManager.updateSessionSettings(id, req.body);
     res.json({ ok: true });
   });
 
   // Update manager step
   router.post('/:id/manager-step', (req: AuthRequest, res) => {
-    const session = sessionManager.getSession(req.params.id);
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -136,13 +141,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       return;
     }
 
-    sessionManager.updateManagerStep(req.params.id, step);
+    sessionManager.updateManagerStep(id, step);
     res.json({ ok: true });
   });
 
   // Approve or deny a pending tool call
   router.post('/:id/approve', (req: AuthRequest, res) => {
-    const session = sessionManager.getSession(req.params.id);
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -158,13 +164,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       return;
     }
 
-    sessionManager.approveToolUse(req.params.id, approvalId, allow, message);
+    sessionManager.approveToolUse(id, approvalId, allow, message);
     res.json({ ok: true });
   });
 
   // Delete (terminate) session
   router.delete('/:id', async (req: AuthRequest, res) => {
-    const session = sessionManager.getSession(req.params.id);
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -174,7 +181,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       return;
     }
 
-    await sessionManager.deleteSession(req.params.id);
+    await sessionManager.deleteSession(id);
     res.status(204).end();
   });
 
