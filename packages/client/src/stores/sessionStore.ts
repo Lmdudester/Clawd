@@ -22,6 +22,7 @@ interface SessionState {
   clearSessionStreamTokens: (sessionId: string) => void;
   setPendingApproval: (sessionId: string, approval: PendingApproval | null) => void;
   setPendingQuestion: (sessionId: string, question: PendingQuestion | null) => void;
+  clearAllPendingState: () => void;
   setAvailableModels: (models: ModelInfo[]) => void;
 }
 
@@ -170,5 +171,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }
       return { pendingQuestions };
     }),
+  clearAllPendingState: () =>
+    set({ pendingApprovals: new Map(), pendingQuestions: new Map() }),
   setAvailableModels: (models) => set({ availableModels: models }),
 }));

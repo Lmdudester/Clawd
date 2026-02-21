@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Component, type ReactNode } from 'react';
 import { useAuthStore } from './stores/authStore';
-import { WebSocketContext, useWebSocketProvider } from './hooks/useWebSocket';
+import { WebSocketContext, useWebSocket, useWebSocketProvider } from './hooks/useWebSocket';
 import { LoginPage } from './components/auth/LoginPage';
 import { SessionList } from './components/sessions/SessionList';
 import { ChatView } from './components/chat/ChatView';
@@ -38,10 +38,25 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   }
 }
 
+function ConnectionStatusIndicator() {
+  const { connectionStatus } = useWebSocket();
+  if (connectionStatus === 'connected') return null;
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 py-1.5 text-xs font-medium bg-yellow-600/90 text-white">
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+      </span>
+      {connectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Disconnected'}
+    </div>
+  );
+}
+
 function AuthenticatedApp() {
   const ws = useWebSocketProvider();
   return (
     <WebSocketContext.Provider value={ws}>
+      <ConnectionStatusIndicator />
       <Routes>
         <Route path="/" element={<SessionList />} />
         <Route path="/session/:id" element={<ChatView />} />
