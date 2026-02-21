@@ -125,7 +125,7 @@ export class SessionManager {
       pendingApproval: null,
       pendingQuestion: null,
       cleanupPromise: null,
-      managerApiToken: managerMode ? v4() : null,
+      managerApiToken: managerMode ? uuid() : null,
       managerContinueTimer: null,
       managerState,
     };
