@@ -46,7 +46,7 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
 
   if (!open) return null;
 
-  const isErrored = session.status === 'error';
+  const isErrored = session.status === 'error' || session.status === 'terminated';
 
   function handleNameCommit() {
     const trimmed = name.trim();
@@ -119,9 +119,11 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
                 <div className="px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-400 text-sm">
                   {session.model
                     ? session.model
-                    : modelsTimedOut
-                      ? 'Unable to load models'
-                      : 'Loading models...'}
+                    : isErrored
+                      ? 'Session unavailable'
+                      : modelsTimedOut
+                        ? 'Unable to load models'
+                        : 'Loading models...'}
                 </div>
               );
             })()}
