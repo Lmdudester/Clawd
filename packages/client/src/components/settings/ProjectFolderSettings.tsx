@@ -10,6 +10,7 @@ export function ProjectFolderSettings() {
   const [newLabel, setNewLabel] = useState('');
   const [newUrl, setNewUrl] = useState('');
   const [newBranch, setNewBranch] = useState('main');
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   useEffect(() => {
     api.getProjectRepos()
@@ -31,11 +32,22 @@ export function ProjectFolderSettings() {
     }
   }
 
+  function isValidRepoUrl(url: string): boolean {
+    // Accept git@host:user/repo, https://host/user/repo, or ssh://... URLs
+    return /^(https?:\/\/.+\/.+|git@.+:.+\/.+|ssh:\/\/.+\/.+)$/.test(url);
+  }
+
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!newLabel.trim() || !newUrl.trim()) return;
+    const trimmedUrl = newUrl.trim();
+    if (!isValidRepoUrl(trimmedUrl)) {
+      setUrlError('Please enter a valid repository URL (e.g. https://github.com/user/repo.git)');
+      return;
+    }
+    setUrlError(null);
     const isFirst = repos.length === 0;
-    const updated = [...repos, { label: newLabel.trim(), url: newUrl.trim(), defaultBranch: newBranch.trim() || 'main', isDefault: isFirst }];
+    const updated = [...repos, { label: newLabel.trim(), url: trimmedUrl, defaultBranch: newBranch.trim() || 'main', isDefault: isFirst }];
     saveRepos(updated);
     setNewLabel('');
     setNewUrl('');
@@ -127,9 +139,10 @@ export function ProjectFolderSettings() {
           type="text"
           placeholder="Repository URL (e.g. https://github.com/user/repo.git)"
           value={newUrl}
-          onChange={(e) => setNewUrl(e.target.value)}
-          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
+          onChange={(e) => { setNewUrl(e.target.value); setUrlError(null); }}
+          className={`w-full px-3 py-2 bg-slate-800 border rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none ${urlError ? 'border-red-500 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'}`}
         />
+        {urlError && <p className="text-xs text-red-400">{urlError}</p>}
         <input
           type="text"
           placeholder="Default branch (e.g. main)"
