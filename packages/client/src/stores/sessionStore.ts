@@ -6,8 +6,8 @@ interface SessionState {
   currentSessionId: string | null;
   messages: Map<string, SessionMessage[]>;
   streamingTokens: Map<string, string>;
-  pendingApproval: PendingApproval | null;
-  pendingQuestion: PendingQuestion | null;
+  pendingApprovals: Map<string, PendingApproval>;
+  pendingQuestions: Map<string, PendingQuestion>;
   availableModels: ModelInfo[];
 
   setSessions: (sessions: SessionInfo[]) => void;
@@ -20,8 +20,8 @@ interface SessionState {
   appendStreamToken: (sessionId: string, messageId: string, token: string) => void;
   clearStreamTokens: (sessionId: string, messageId: string) => void;
   clearSessionStreamTokens: (sessionId: string) => void;
-  setPendingApproval: (approval: PendingApproval | null) => void;
-  setPendingQuestion: (question: PendingQuestion | null) => void;
+  setPendingApproval: (sessionId: string, approval: PendingApproval | null) => void;
+  setPendingQuestion: (sessionId: string, question: PendingQuestion | null) => void;
   setAvailableModels: (models: ModelInfo[]) => void;
 }
 
@@ -30,8 +30,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   currentSessionId: null,
   messages: new Map(),
   streamingTokens: new Map(),
-  pendingApproval: null,
-  pendingQuestion: null,
+  pendingApprovals: new Map(),
+  pendingQuestions: new Map(),
   availableModels: [],
 
   setSessions: (sessions) => set({ sessions }),
@@ -68,10 +68,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           streamingTokens.delete(key);
         }
       }
+      const pendingApprovals = new Map(state.pendingApprovals);
+      pendingApprovals.delete(id);
+      const pendingQuestions = new Map(state.pendingQuestions);
+      pendingQuestions.delete(id);
       return {
         sessions: state.sessions.filter((s) => s.id !== id),
         messages,
         streamingTokens,
+        pendingApprovals,
+        pendingQuestions,
       };
     }),
 
@@ -144,7 +150,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return { streamingTokens };
     }),
 
-  setPendingApproval: (approval) => set({ pendingApproval: approval }),
-  setPendingQuestion: (question) => set({ pendingQuestion: question }),
+  setPendingApproval: (sessionId, approval) =>
+    set((state) => {
+      const pendingApprovals = new Map(state.pendingApprovals);
+      if (approval) {
+        pendingApprovals.set(sessionId, approval);
+      } else {
+        pendingApprovals.delete(sessionId);
+      }
+      return { pendingApprovals };
+    }),
+  setPendingQuestion: (sessionId, question) =>
+    set((state) => {
+      const pendingQuestions = new Map(state.pendingQuestions);
+      if (question) {
+        pendingQuestions.set(sessionId, question);
+      } else {
+        pendingQuestions.delete(sessionId);
+      }
+      return { pendingQuestions };
+    }),
   setAvailableModels: (models) => set({ availableModels: models }),
 }));

@@ -35,8 +35,8 @@ describe('sessionStore', () => {
       currentSessionId: null,
       messages: new Map(),
       streamingTokens: new Map(),
-      pendingApproval: null,
-      pendingQuestion: null,
+      pendingApprovals: new Map(),
+      pendingQuestions: new Map(),
       availableModels: [],
     });
   });
@@ -190,22 +190,36 @@ describe('sessionStore', () => {
   });
 
   describe('pending state', () => {
-    it('sets and clears pendingApproval', () => {
+    it('sets and clears pendingApproval per session', () => {
       const approval = { approvalId: 'a1', toolName: 'Bash', toolInput: {} };
-      useSessionStore.getState().setPendingApproval(approval as any);
-      expect(useSessionStore.getState().pendingApproval).toBeDefined();
+      useSessionStore.getState().setPendingApproval('s1', approval as any);
+      expect(useSessionStore.getState().pendingApprovals.get('s1')).toBeDefined();
 
-      useSessionStore.getState().setPendingApproval(null);
-      expect(useSessionStore.getState().pendingApproval).toBeNull();
+      useSessionStore.getState().setPendingApproval('s1', null);
+      expect(useSessionStore.getState().pendingApprovals.has('s1')).toBe(false);
     });
 
-    it('sets and clears pendingQuestion', () => {
+    it('sets and clears pendingQuestion per session', () => {
       const question = { questionId: 'q1', question: 'Choose one' };
-      useSessionStore.getState().setPendingQuestion(question as any);
-      expect(useSessionStore.getState().pendingQuestion).toBeDefined();
+      useSessionStore.getState().setPendingQuestion('s1', question as any);
+      expect(useSessionStore.getState().pendingQuestions.get('s1')).toBeDefined();
 
-      useSessionStore.getState().setPendingQuestion(null);
-      expect(useSessionStore.getState().pendingQuestion).toBeNull();
+      useSessionStore.getState().setPendingQuestion('s1', null);
+      expect(useSessionStore.getState().pendingQuestions.has('s1')).toBe(false);
+    });
+
+    it('isolates pending state between sessions', () => {
+      const approval1 = { approvalId: 'a1', toolName: 'Bash', toolInput: {} };
+      const approval2 = { approvalId: 'a2', toolName: 'Edit', toolInput: {} };
+      useSessionStore.getState().setPendingApproval('s1', approval1 as any);
+      useSessionStore.getState().setPendingApproval('s2', approval2 as any);
+
+      expect(useSessionStore.getState().pendingApprovals.get('s1')).toEqual(approval1);
+      expect(useSessionStore.getState().pendingApprovals.get('s2')).toEqual(approval2);
+
+      useSessionStore.getState().setPendingApproval('s1', null);
+      expect(useSessionStore.getState().pendingApprovals.has('s1')).toBe(false);
+      expect(useSessionStore.getState().pendingApprovals.get('s2')).toEqual(approval2);
     });
   });
 });

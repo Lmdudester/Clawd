@@ -23,8 +23,8 @@ export function ChatView() {
   const sessions = useSessionStore((s) => s.sessions);
   const session = sessions.find((s) => s.id === id);
   const messages = useSessionStore((s) => s.messages.get(id ?? '')) ?? EMPTY_MESSAGES;
-  const pendingApproval = useSessionStore((s) => s.pendingApproval);
-  const pendingQuestion = useSessionStore((s) => s.pendingQuestion);
+  const pendingApproval = useSessionStore((s) => id ? s.pendingApprovals.get(id) ?? null : null);
+  const pendingQuestion = useSessionStore((s) => id ? s.pendingQuestions.get(id) ?? null : null);
   const setCurrentSession = useSessionStore((s) => s.setCurrentSession);
   const setMessages = useSessionStore((s) => s.setMessages);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -92,8 +92,8 @@ export function ChatView() {
   const handleInterrupt = useCallback(() => {
     if (!id) return;
     send({ type: 'interrupt', sessionId: id });
-    setPendingApproval(null);
-    setPendingQuestion(null);
+    setPendingApproval(id, null);
+    setPendingQuestion(id, null);
   }, [id, send, setPendingApproval, setPendingQuestion]);
 
   const handlePauseManager = useCallback(() => {

@@ -77,15 +77,15 @@ export function useWebSocketProvider(): { send: SendFn } {
           clearStreamTokens(message.sessionId, message.messageId);
           break;
         case 'approval_request':
-          setPendingApproval(message.approval);
+          setPendingApproval(message.sessionId, message.approval);
           break;
         case 'question':
-          setPendingQuestion(message.question);
+          setPendingQuestion(message.sessionId, message.question);
           break;
         case 'result':
           clearSessionStreamTokens(message.sessionId);
-          setPendingApproval(null);
-          setPendingQuestion(null);
+          setPendingApproval(message.sessionId, null);
+          setPendingQuestion(message.sessionId, null);
           break;
         case 'models_list':
           setAvailableModels(message.models);
