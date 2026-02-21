@@ -18,7 +18,8 @@ RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 # Set up non-root user + Docker socket access (socket is root:root on Docker Desktop)
 RUN mkdir -p /home/node/.claude \
     && echo '{"hasCompletedOnboarding":true}' > /home/node/.claude.json \
-    && chown -R node:node /app /home/node/.claude /home/node/.claude.json
+    && chown -R node:node /app /home/node/.claude /home/node/.claude.json \
+    && usermod -aG root node
 
 USER node
 ENV HOME=/home/node
