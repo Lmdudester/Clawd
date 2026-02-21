@@ -84,7 +84,7 @@ describe('getToolSummary', () => {
     const result = getToolSummary('Read', { file_path: '/a/b/c/d/e/file.ts', offset: 10, limit: 20 });
     expect(result).toContain('file.ts');
     expect(result).toContain('10');
-    expect(result).toContain('30'); // offset + limit
+    expect(result).toContain('29'); // offset + limit - 1
   });
 
   it('formats Grep with pattern and path', () => {
