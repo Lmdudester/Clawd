@@ -399,12 +399,21 @@ export class SessionManager {
       console.warn(`[session:${sessionId}] Cannot send to agent: no WebSocket (message type: ${message.type})`);
       return;
     }
-    session.agentWs.send(JSON.stringify(message));
+    try {
+      session.agentWs.send(JSON.stringify(message));
+    } catch (err) {
+      console.error(`[session:${sessionId}] Failed to send to agent (message type: ${message.type}):`, (err as Error).message);
+    }
   }
 
   sendMessage(sessionId: string, content: string): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+
+    if (session.info.status === 'terminated' || session.info.status === 'error') {
+      console.warn(`[session:${sessionId}] Rejecting message to ${session.info.status} session`);
+      return;
+    }
 
     // Store user message locally
     this.addMessage(session, {
