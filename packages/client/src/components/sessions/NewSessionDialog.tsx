@@ -25,6 +25,22 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
   const addSession = useSessionStore((s) => s.addSession);
   const navigate = useNavigate();
 
+  // Reset form state whenever the dialog closes
+  useEffect(() => {
+    if (!open) {
+      setName('');
+      setRepoUrl('');
+      setBranch('');
+      setBranches([]);
+      setSelectedRepo(null);
+      setIsNewBranch(false);
+      setNewBranchName('');
+      setDockerAccess(false);
+      setManagerMode(false);
+      setError('');
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -121,15 +137,6 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
       addSession(res.session);
       navigate(`/session/${res.session.id}`);
       onClose();
-      setName('');
-      setRepoUrl('');
-      setBranch('');
-      setBranches([]);
-      setSelectedRepo(null);
-      setIsNewBranch(false);
-      setNewBranchName('');
-      setDockerAccess(false);
-      setManagerMode(false);
     } catch (err: any) {
       setError(err.message || 'Failed to create session');
     } finally {
