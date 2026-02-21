@@ -38,8 +38,12 @@ type SessionEventHandler = (sessionId: string, event: string, data: unknown) => 
 // Keep the most recent N messages per session to prevent unbounded memory growth.
 const MAX_MESSAGES_PER_SESSION = 500;
 
+// How long to keep terminated sessions in memory before evicting them (5 minutes).
+const TERMINATED_SESSION_TTL_MS = 5 * 60 * 1000;
+
 export class SessionManager {
   private sessions = new Map<string, ManagedSession>();
+  private evictionTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private eventHandler: SessionEventHandler | null = null;
   private credentialStore: CredentialStore;
   private containerManager: ContainerManager;
@@ -577,9 +581,15 @@ export class SessionManager {
 
     session.cleanupPromise = cleanup();
     await session.cleanupPromise;
+
+    // Schedule eviction from memory so terminated sessions don't linger forever
+    this.scheduleEviction(sessionId);
   }
 
   async deleteSession(sessionId: string): Promise<void> {
+    // Cancel any pending eviction timer — we're removing immediately
+    this.cancelEviction(sessionId);
+
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
@@ -603,6 +613,26 @@ export class SessionManager {
 
     session.cleanupPromise = cleanup();
     await session.cleanupPromise;
+  }
+
+  private scheduleEviction(sessionId: string): void {
+    this.cancelEviction(sessionId);
+    const timer = setTimeout(() => {
+      this.evictionTimers.delete(sessionId);
+      if (this.sessions.has(sessionId)) {
+        console.log(`[session:${sessionId}] Evicting terminated session from memory`);
+        this.sessions.delete(sessionId);
+      }
+    }, TERMINATED_SESSION_TTL_MS);
+    this.evictionTimers.set(sessionId, timer);
+  }
+
+  private cancelEviction(sessionId: string): void {
+    const timer = this.evictionTimers.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.evictionTimers.delete(sessionId);
+    }
   }
 
   // Auto-continue logic for manager sessions.
