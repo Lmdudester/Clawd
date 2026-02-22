@@ -60,6 +60,10 @@ export class MessageRouter {
 
     switch (message.type) {
       case 'subscribe':
+        if (!this.isSessionOwner(ws, message.sessionId)) {
+          ws.send(JSON.stringify({ type: 'error', sessionId: message.sessionId, message: 'Not authorized for this session' }));
+          return;
+        }
         this.connectionManager.subscribe(ws, message.sessionId);
         // Send current messages for this session
         const messages = this.sessionManager.getMessages(message.sessionId);
