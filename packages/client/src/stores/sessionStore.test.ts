@@ -42,10 +42,11 @@ describe('sessionStore', () => {
   });
 
   describe('updateSession', () => {
-    it('does not add a session that is not already in the store', () => {
+    it('upserts a session that is not already in the store', () => {
       const s = session({ id: 'new-1' });
       useSessionStore.getState().updateSession(s);
-      expect(useSessionStore.getState().sessions).toHaveLength(0);
+      expect(useSessionStore.getState().sessions).toHaveLength(1);
+      expect(useSessionStore.getState().sessions[0].id).toBe('new-1');
     });
 
     it('replaces existing session by ID', () => {
