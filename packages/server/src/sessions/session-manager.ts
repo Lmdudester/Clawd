@@ -598,7 +598,7 @@ export class SessionManager {
     this.sendToAgent(sessionId, {
       type: 'update_settings',
       permissionMode: settings.permissionMode,
-      name: settings.name,
+      name: session.info.name,
       notificationsEnabled: settings.notificationsEnabled,
     });
   }
