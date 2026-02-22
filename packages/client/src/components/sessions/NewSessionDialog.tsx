@@ -308,7 +308,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
             </button>
             <button
               type="submit"
-              disabled={loading || !name || !repoUrl || (!managerMode && !effectiveBranch)}
+              disabled={loading || !name.trim() || !repoUrl || (!managerMode && !effectiveBranch)}
               className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors"
               data-testid="create-session-button"
             >

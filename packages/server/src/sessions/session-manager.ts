@@ -559,6 +559,8 @@ export class SessionManager {
     this.sendToAgent(sessionId, { type: 'set_model', model });
   }
 
+  private static readonly VALID_PERMISSION_MODES = new Set(['normal', 'auto_edits', 'dangerous', 'plan']);
+
   updateSessionSettings(sessionId: string, settings: SessionSettingsUpdate): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
@@ -567,6 +569,10 @@ export class SessionManager {
       session.info.name = settings.name;
     }
     if (settings.permissionMode !== undefined) {
+      if (!SessionManager.VALID_PERMISSION_MODES.has(settings.permissionMode)) {
+        console.warn(`[session:${sessionId}] Invalid permissionMode: ${settings.permissionMode}`);
+        return;
+      }
       session.info.permissionMode = settings.permissionMode;
     }
     if (settings.notificationsEnabled !== undefined) {
