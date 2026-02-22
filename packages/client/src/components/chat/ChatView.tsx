@@ -133,7 +133,7 @@ export function ChatView() {
   );
 
   const isInputDisabled = session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer' || session?.status === 'terminated' || session?.status === 'starting' || session?.status === 'error';
-  const isInterruptible = session?.status === 'running' || session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer';
+  const isInterruptible = (session?.status === 'running' || session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer') && !(session?.isManager && !session?.managerState?.paused);
   const isManagerPaused = !!session?.isManager && !!session?.managerState?.paused;
 
   if (sessionNotFound) {

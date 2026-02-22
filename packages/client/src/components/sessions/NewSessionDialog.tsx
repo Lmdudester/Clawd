@@ -145,7 +145,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
     setRepoUrl(repos[index].url);
     setBranch(repos[index].defaultBranch);
     fetchBranches(repos[index].url, repos[index].defaultBranch);
-    if (managerMode && !name.trim()) {
+    if (managerMode && (!name.trim() || name.endsWith(' Manager'))) {
       setName(`${repoShortName(repos[index].url)} Manager`);
     }
   }
