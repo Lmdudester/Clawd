@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -6,6 +6,46 @@ import { api } from '../../lib/api';
 import { SessionCard } from './SessionCard';
 import { NewSessionDialog } from './NewSessionDialog';
 import { UsageCard } from './UsageCard';
+import type { SessionInfo, SessionStatus } from '@clawd/shared';
+
+type SessionTypeFilter = 'all' | 'regular' | 'manager' | 'managed';
+
+const TYPE_FILTERS: { value: SessionTypeFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'regular', label: 'Regular' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'managed', label: 'Managed' },
+];
+
+const STATUS_FILTERS: { value: SessionStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'Any status' },
+  { value: 'running', label: 'Running' },
+  { value: 'idle', label: 'Idle' },
+  { value: 'starting', label: 'Starting' },
+  { value: 'awaiting_approval', label: 'Awaiting approval' },
+  { value: 'awaiting_answer', label: 'Awaiting answer' },
+  { value: 'error', label: 'Error' },
+  { value: 'terminated', label: 'Terminated' },
+];
+
+function matchesType(session: SessionInfo, filter: SessionTypeFilter): boolean {
+  switch (filter) {
+    case 'all': return true;
+    case 'regular': return !session.isManager && !session.managedBy;
+    case 'manager': return !!session.isManager;
+    case 'managed': return !!session.managedBy;
+  }
+}
+
+function matchesSearch(session: SessionInfo, query: string): boolean {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  return (
+    session.name.toLowerCase().includes(q) ||
+    session.repoUrl.toLowerCase().includes(q) ||
+    session.branch.toLowerCase().includes(q)
+  );
+}
 
 export function SessionList() {
   const navigate = useNavigate();
@@ -15,12 +55,26 @@ export function SessionList() {
   const setSessions = useSessionStore((s) => s.setSessions);
   const logout = useAuthStore((s) => s.logout);
 
+  const [typeFilter, setTypeFilter] = useState<SessionTypeFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<SessionStatus | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
   useEffect(() => {
     api.getSessions()
       .then((res) => setSessions(res.sessions))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [setSessions]);
+
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((s) =>
+      matchesType(s, typeFilter) &&
+      (statusFilter === 'all' || s.status === statusFilter) &&
+      matchesSearch(s, searchQuery)
+    );
+  }, [sessions, typeFilter, statusFilter, searchQuery]);
+
+  const hasFilters = typeFilter !== 'all' || statusFilter !== 'all' || searchQuery !== '';
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -46,6 +100,60 @@ export function SessionList() {
             </button>
           </div>
         </div>
+
+        {/* Filter bar */}
+        {!loading && sessions.length > 0 && (
+          <div className="px-4 pb-3 flex flex-wrap items-center gap-2">
+            {/* Type filter chips */}
+            <div className="flex items-center gap-1">
+              {TYPE_FILTERS.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setTypeFilter(f.value)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    typeFilter === f.value
+                      ? 'bg-blue-600 border-blue-500 text-white'
+                      : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Status filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as SessionStatus | 'all')}
+              className="text-xs bg-slate-800/60 border border-slate-700 text-slate-300 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+            >
+              {STATUS_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
+
+            {/* Search */}
+            <div className="flex-1 min-w-[120px]">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search..."
+                className="w-full text-xs bg-slate-800/60 border border-slate-700 text-slate-300 rounded px-2.5 py-1 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Clear filters */}
+            {hasFilters && (
+              <button
+                onClick={() => { setTypeFilter('all'); setStatusFilter('all'); setSearchQuery(''); }}
+                className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Session list */}
@@ -58,8 +166,12 @@ export function SessionList() {
             <p className="text-lg mb-1">No sessions yet</p>
             <p className="text-sm">Create one to get started</p>
           </div>
+        ) : filteredSessions.length === 0 ? (
+          <div className="text-center text-slate-500 py-12">
+            <p className="text-sm">No sessions match the current filters</p>
+          </div>
         ) : (
-          sessions.map((session) => (
+          filteredSessions.map((session) => (
             <SessionCard key={session.id} session={session} />
           ))
         )}

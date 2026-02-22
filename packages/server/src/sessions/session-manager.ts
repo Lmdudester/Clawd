@@ -192,6 +192,23 @@ export class SessionManager {
     return null;
   }
 
+  // Remove a child session from its parent manager's tracking
+  private untrackChildSession(childId: string): void {
+    const child = this.sessions.get(childId);
+    const managerId = child?.info.managedBy;
+    if (!managerId) return;
+
+    const manager = this.sessions.get(managerId);
+    if (!manager?.managerState) return;
+
+    const idx = manager.managerState.childSessionIds.indexOf(childId);
+    if (idx !== -1) {
+      manager.managerState.childSessionIds.splice(idx, 1);
+      manager.info.managerState = manager.managerState;
+      this.emit(managerId, 'session_update', manager.info);
+    }
+  }
+
   // Link a child session to its parent manager
   trackChildSession(managerId: string, childId: string): void {
     const session = this.sessions.get(managerId);
@@ -654,6 +671,9 @@ export class SessionManager {
       return;
     }
 
+    // Remove from parent manager's tracking before cleanup
+    this.untrackChildSession(sessionId);
+
     const cleanup = async () => {
       // Clear auto-continue timer
       if (session.managerContinueTimer) {
@@ -691,6 +711,9 @@ export class SessionManager {
       // Session may have been deleted by a concurrent deleteSession call
       if (!this.sessions.has(sessionId)) return;
     }
+
+    // Remove from parent manager's tracking before cleanup
+    this.untrackChildSession(sessionId);
 
     const cleanup = async () => {
       // Clear auto-continue timer
