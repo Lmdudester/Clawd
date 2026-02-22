@@ -152,6 +152,7 @@ export function ProjectFolderSettings() {
         <input
           type="text"
           placeholder="Label (e.g. My Project)"
+          aria-label="Repository label"
           value={newLabel}
           onChange={(e) => setNewLabel(e.target.value)}
           className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
@@ -159,6 +160,7 @@ export function ProjectFolderSettings() {
         <input
           type="text"
           placeholder="Repository URL (e.g. https://github.com/user/repo.git)"
+          aria-label="Repository URL"
           value={newUrl}
           onChange={(e) => { setNewUrl(e.target.value); setUrlError(null); }}
           className={`w-full px-3 py-2 bg-slate-800 border rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none ${urlError ? 'border-red-500 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'}`}
@@ -167,6 +169,7 @@ export function ProjectFolderSettings() {
         <input
           type="text"
           placeholder="Default branch (e.g. main)"
+          aria-label="Default branch"
           value={newBranch}
           onChange={(e) => setNewBranch(e.target.value)}
           className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"

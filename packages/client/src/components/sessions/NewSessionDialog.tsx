@@ -102,6 +102,38 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
       .catch(() => {});
   }, [open, fetchBranches]);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap and initial focus
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    // Focus first input on open
+    const firstInput = dialog.querySelector<HTMLElement>('input, select, textarea, button');
+    firstInput?.focus();
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const focusable = dialog.querySelectorAll<HTMLElement>(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleTab);
+    return () => document.removeEventListener('keydown', handleTab);
+  }, [open]);
+
   if (!open) return null;
 
   function handleRepoSelect(index: number) {
@@ -162,9 +194,13 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-session-dialog-title"
         className="w-full max-w-md bg-slate-800 rounded-t-2xl sm:rounded-2xl border border-slate-700 p-6"
       >
-        <h2 className="text-lg font-bold text-white mb-4">New Session</h2>
+        <h2 id="new-session-dialog-title" className="text-lg font-bold text-white mb-4">New Session</h2>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {error && (
@@ -174,6 +210,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
           <input
             type="text"
             placeholder="Session name"
+            aria-label="Session name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
@@ -184,6 +221,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
             <>
               <select
                 value={selectedRepo === null ? 'other' : String(selectedRepo)}
+                aria-label="Repository"
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === 'other') {
@@ -210,6 +248,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
                 <input
                   type="text"
                   placeholder="Repository URL (e.g. https://github.com/user/repo.git)"
+                  aria-label="Repository URL"
                   value={repoUrl}
                   onChange={(e) => setRepoUrl(e.target.value)}
                   onBlur={() => {
@@ -223,6 +262,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
             <input
               type="text"
               placeholder="Repository URL (e.g. https://github.com/user/repo.git)"
+              aria-label="Repository URL"
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
               onBlur={() => {
@@ -243,6 +283,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
                 <>
                   <select
                     value={isNewBranch ? '__new__' : branch}
+                    aria-label="Branch"
                     onChange={(e) => handleBranchChange(e.target.value)}
                     className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
                   >
@@ -256,6 +297,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
                     <input
                       type="text"
                       placeholder="New branch name"
+                      aria-label="New branch name"
                       value={newBranchName}
                       onChange={(e) => setNewBranchName(e.target.value)}
                       className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
@@ -267,6 +309,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
                 <input
                   type="text"
                   placeholder="Branch (e.g. main)"
+                  aria-label="Branch"
                   value={branch}
                   onChange={(e) => setBranch(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"

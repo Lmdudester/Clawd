@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api';
 import { SkillPicker } from './SkillPicker';
+import { useSessionStore } from '../../stores/sessionStore';
 import type { SkillInfo } from '@clawd/shared';
 
 interface Props {
@@ -8,14 +9,22 @@ interface Props {
   disabled?: boolean;
   isInterruptible?: boolean;
   onInterrupt?: () => void;
+  sessionId?: string;
 }
 
-export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt }: Props) {
-  const [value, setValue] = useState('');
+export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt, sessionId }: Props) {
+  const setDraftMessage = useSessionStore((s) => s.setDraftMessage);
+  const initialDraft = useSessionStore((s) => sessionId ? s.draftMessages.get(sessionId) ?? '' : '');
+  const [value, setValue] = useState(initialDraft);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [showSkillPicker, setShowSkillPicker] = useState(false);
   const skillsFetchedRef = useRef(false);
+
+  // Sync draft to store so it persists across unmount/remount
+  useEffect(() => {
+    if (sessionId) setDraftMessage(sessionId, value);
+  }, [sessionId, value, setDraftMessage]);
 
   // Auto-focus on mount and when transitioning from disabled to enabled
   useEffect(() => {
@@ -134,6 +143,7 @@ export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt }:
         onKeyDown={handleKeyDown}
         onInput={handleInput}
         placeholder="Message Claude..."
+        aria-label="Message input"
         disabled={disabled}
         rows={1}
         className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none text-base"

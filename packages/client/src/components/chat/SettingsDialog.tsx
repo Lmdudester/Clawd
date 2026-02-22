@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { SessionInfo, PermissionMode, ModelInfo } from '@clawd/shared';
 import { MODE_THEME } from '../../lib/mode-theme';
 
@@ -51,6 +51,37 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
     }
   }, [open, onRequestModels]);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap and initial focus
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const firstInput = dialog.querySelector<HTMLElement>('input, select, textarea, button');
+    firstInput?.focus();
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const focusable = dialog.querySelectorAll<HTMLElement>(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleTab);
+    return () => document.removeEventListener('keydown', handleTab);
+  }, [open]);
+
   if (!open) return null;
 
   const isErrored = session.status === 'error' || session.status === 'terminated';
@@ -69,9 +100,13 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-dialog-title"
         className="w-full max-w-md bg-slate-800 rounded-t-2xl sm:rounded-2xl border border-slate-700 p-6"
       >
-        <h2 className="text-lg font-bold text-white mb-5">Session Settings</h2>
+        <h2 id="settings-dialog-title" className="text-lg font-bold text-white mb-5">Session Settings</h2>
 
         <div className="space-y-5">
           {/* Session Name */}
@@ -79,6 +114,7 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
             <label className="block text-sm font-medium text-slate-400 mb-1.5">Session Name</label>
             <input
               type="text"
+              aria-label="Session name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onBlur={handleNameCommit}

@@ -65,6 +65,7 @@ export function QuestionPanel({ question, onAnswer, onInterrupt }: Props) {
           <input
             type="text"
             placeholder="Or type a custom answer..."
+            aria-label="Custom answer"
             value={customInputs[q.question] ?? ''}
             onChange={(e) => setCustomInputs((prev) => ({ ...prev, [q.question]: e.target.value }))}
             className="mt-2 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"

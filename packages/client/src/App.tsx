@@ -1,12 +1,23 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Component, type ReactNode } from 'react';
 import { useAuthStore } from './stores/authStore';
-import { WebSocketContext, useWebSocketProvider } from './hooks/useWebSocket';
+import { WebSocketContext, useWebSocketProvider, useWebSocket } from './hooks/useWebSocket';
 import { LoginPage } from './components/auth/LoginPage';
 import { SessionList } from './components/sessions/SessionList';
 import { ChatView } from './components/chat/ChatView';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { ToastContainer } from './components/ui/ToastContainer';
+
+function ConnectionBanner() {
+  const { connectionStatus } = useWebSocket();
+  if (connectionStatus === 'connected') return null;
+  const label = connectionStatus === 'reconnecting' ? 'Reconnecting...' : connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected';
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-600 text-white text-center text-sm py-1.5 font-medium" role="alert">
+      {label}
+    </div>
+  );
+}
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -42,6 +53,7 @@ function AuthenticatedApp() {
   const ws = useWebSocketProvider();
   return (
     <WebSocketContext.Provider value={ws}>
+      <ConnectionBanner />
       <Routes>
         <Route path="/" element={<SessionList />} />
         <Route path="/session/:id" element={<ChatView />} />
