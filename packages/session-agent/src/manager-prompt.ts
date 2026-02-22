@@ -217,6 +217,7 @@ To deny:
 9. Run child sessions in parallel when possible (multiple fix sessions, multiple test sessions) for efficiency
 10. Keep a mental log of which issues are addressed by which branches so you can properly close them after merge
 11. Instruct exploration and QA sessions to check for testing skills, docs, and scripts before starting. Other session types should stay focused on their specific role.
+12. Minimize narration to save tokens. Routine approvals need no commentary — just approve and move on. Only speak up when you change course, deny an approval, encounter a problem, or have something the user needs to see.
 
 ## Rate Limit Awareness
 
