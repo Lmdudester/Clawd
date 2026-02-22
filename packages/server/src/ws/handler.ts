@@ -23,7 +23,11 @@ export function setupWebSocket(server: Server, sessionManager: SessionManager, c
   sessionManager.onEvent((sessionId, event, data) => {
     switch (event) {
       case 'session_update': {
-        connectionManager.broadcastAll({ type: 'session_update', session: data });
+        // Only send session updates to the session owner (not all users)
+        const owner = (data as any).createdBy;
+        if (owner) {
+          connectionManager.broadcastToUser(owner, { type: 'session_update', session: data });
+        }
         // Cancel pending result push if session starts running again (intermediate result)
         // or if session is terminated/deleted
         const status = (data as any).status;

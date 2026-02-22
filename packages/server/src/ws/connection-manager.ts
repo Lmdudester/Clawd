@@ -45,6 +45,16 @@ export class ConnectionManager {
     }
   }
 
+  // Broadcast a message only to clients authenticated as the given username
+  broadcastToUser(username: string, message: object): void {
+    const data = JSON.stringify(message);
+    for (const client of this.clients.values()) {
+      if (client.username === username && client.ws.readyState === 1) {
+        client.ws.send(data);
+      }
+    }
+  }
+
   // Check if any connected client has an open WebSocket subscribed to this session
   hasSubscribers(sessionId: string): boolean {
     for (const client of this.clients.values()) {

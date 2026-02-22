@@ -40,21 +40,29 @@ const READONLY_BASH_PATTERNS = [
   /^tail\b/,
 ];
 
+// Curl flags that perform writes, uploads, or output to files — deny these
+const DANGEROUS_CURL_FLAGS = /(?:^|\s)(?:-X\s+(?!GET\b)\S|-d\b|--data\b|--data-\w+\b|-F\b|--form\b|-T\b|--upload-file\b|-o\b|--output\b|-O\b|--remote-name\b)/i;
+
 export function isReadOnlyBash(toolName: string, input: Record<string, unknown>): boolean {
   if (toolName !== 'Bash') return false;
   const cmd = (typeof input.command === 'string' ? input.command : '').trim();
   if (!cmd) return false;
 
-  // Split on shell operators (|, ||, &&, ;, $(...), backticks, newlines) and check each sub-command.
+  // Reject commands containing subshell/command-substitution patterns
+  if (/\$\(|`/.test(cmd)) return false;
+
+  // Reject output redirection (>, >>), and process substitution (<(...), >(...))
+  if (/>{1,2}|<\(|>\(/.test(cmd)) return false;
+
+  // Split on shell operators (|, ||, &&, ;, newlines) and check each sub-command.
   // If any sub-command is not in the read-only list, the entire command is not read-only.
   const subCommands = cmd.split(/\|{1,2}|&&|;|\n/).map(s => s.trim()).filter(Boolean);
-
-  // Also reject commands containing subshell/command-substitution patterns
-  if (/\$\(|`/.test(cmd)) return false;
 
   for (const sub of subCommands) {
     // Reject gh api with --method that isn't GET
     if (/^gh\s+api\s/.test(sub) && /--method\s+(?!GET\b)/i.test(sub)) return false;
+    // Reject curl with dangerous flags (POST, upload, output to file, etc.)
+    if (/^curl\s/.test(sub) && DANGEROUS_CURL_FLAGS.test(sub)) return false;
     if (!READONLY_BASH_PATTERNS.some(p => p.test(sub))) return false;
   }
 
