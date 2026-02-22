@@ -32,6 +32,8 @@ export interface SessionListResponse {
 export interface SessionDetailResponse {
   session: import('./session.js').SessionInfo;
   messages: import('./session.js').SessionMessage[];
+  pendingApproval: import('./session.js').PendingApproval | null;
+  pendingQuestion: import('./session.js').PendingQuestion | null;
 }
 
 export interface ErrorResponse {
