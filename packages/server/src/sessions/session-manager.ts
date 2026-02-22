@@ -42,9 +42,13 @@ const MAX_MESSAGES_PER_SESSION = 500;
 // How long to keep terminated sessions in memory before evicting them (5 minutes).
 const TERMINATED_SESSION_TTL_MS = 5 * 60 * 1000;
 
+// How long a managed child can go without agent messages before considered stale.
+const CHILD_ACTIVITY_TIMEOUT_MS = 30_000;
+
 export class SessionManager {
   private sessions = new Map<string, ManagedSession>();
   private evictionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private childActivityTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private eventHandler: SessionEventHandler | null = null;
   private credentialStore: CredentialStore;
   private containerManager: ContainerManager;
@@ -194,6 +198,8 @@ export class SessionManager {
 
   // Remove a child session from its parent manager's tracking
   private untrackChildSession(childId: string): void {
+    this.clearChildActivityTimer(childId);
+
     const child = this.sessions.get(childId);
     const managerId = child?.info.managedBy;
     if (!managerId) return;
@@ -322,6 +328,11 @@ export class SessionManager {
   handleAgentMessage(sessionId: string, message: AgentToMasterMessage): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+
+    // Reset activity timer for managed children
+    if (session.info.managedBy) {
+      this.resetChildActivityTimer(sessionId);
+    }
 
     switch (message.type) {
       case 'ready':
@@ -682,6 +693,9 @@ export class SessionManager {
         session.managerContinueTimer = null;
       }
 
+      // Clear child activity timer
+      this.clearChildActivityTimer(sessionId);
+
       // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
       this.updateStatus(session, 'terminated');
       // Explicitly close the agent WebSocket before nulling it so the close
@@ -925,6 +939,11 @@ Approval ID: ${approval.id}`;
     childId: string, child: ManagedSession,
     previousStatus: SessionStatus, newStatus: SessionStatus
   ): void {
+    // Clear stale timer on terminal transitions — these generate their own events
+    if (newStatus === 'idle' || newStatus === 'error' || newStatus === 'terminated') {
+      this.clearChildActivityTimer(childId);
+    }
+
     const managerId = child.info.managedBy;
     if (!managerId) return;
     const manager = this.sessions.get(managerId);
@@ -970,6 +989,39 @@ Approval ID: ${approval.id}`;
     }
 
     return parts.length > 0 ? parts.join('\n\n') : '(no output captured)';
+  }
+
+  private resetChildActivityTimer(childId: string): void {
+    this.clearChildActivityTimer(childId);
+
+    const child = this.sessions.get(childId);
+    const managerId = child?.info.managedBy;
+    if (!managerId) return;
+
+    // Don't start a timer for terminal states — those produce their own events
+    const { status } = child.info;
+    if (status === 'terminated' || status === 'error') return;
+
+    const timer = setTimeout(() => {
+      this.childActivityTimers.delete(childId);
+
+      const c = this.sessions.get(childId);
+      const m = managerId ? this.sessions.get(managerId) : undefined;
+      if (!c || !m?.info.isManager || m.managerState?.paused) return;
+
+      const message = `[CHILD SESSION STALE]\nSession: "${c.info.name}" (ID: ${childId})\nNo activity from this session for 30 seconds. Check on its progress and determine if it needs help.`;
+      this.deliverOrQueueManagerEvent(managerId, m, message);
+    }, CHILD_ACTIVITY_TIMEOUT_MS);
+
+    this.childActivityTimers.set(childId, timer);
+  }
+
+  private clearChildActivityTimer(childId: string): void {
+    const timer = this.childActivityTimers.get(childId);
+    if (timer) {
+      clearTimeout(timer);
+      this.childActivityTimers.delete(childId);
+    }
   }
 
   private deliverOrQueueManagerEvent(managerId: string, manager: ManagedSession, message: string): void {

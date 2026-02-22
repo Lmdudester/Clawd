@@ -27,6 +27,12 @@ export type ChildEvent =
       sessionName: string;
       sessionId: string;
       body: string;
+    }
+  | {
+      kind: 'session_stale';
+      sessionName: string;
+      sessionId: string;
+      body: string;
     };
 
 const SESSION_LINE_RE = /^Session:\s*"(.+?)"\s*\(ID:\s*(.+?)\)\s*$/m;
@@ -121,6 +127,16 @@ function parseSessionError(text: string): ChildEvent | null {
   return { kind: 'session_error', ...session, body };
 }
 
+function parseSessionStale(text: string): ChildEvent | null {
+  const session = parseSessionLine(text);
+  if (!session) return null;
+
+  const sessionLineEnd = text.indexOf('\n', text.indexOf('(ID:'));
+  const body = sessionLineEnd !== -1 ? text.slice(sessionLineEnd + 1).trim() : '';
+
+  return { kind: 'session_stale', ...session, body };
+}
+
 function parseSingleEvent(segment: string): ChildEvent | null {
   const trimmed = segment.trim();
   if (trimmed.startsWith('[CHILD APPROVAL REQUEST]')) {
@@ -134,6 +150,9 @@ function parseSingleEvent(segment: string): ChildEvent | null {
   }
   if (trimmed.startsWith('[CHILD SESSION ERROR]')) {
     return parseSessionError(trimmed);
+  }
+  if (trimmed.startsWith('[CHILD SESSION STALE]')) {
+    return parseSessionStale(trimmed);
   }
   return null;
 }

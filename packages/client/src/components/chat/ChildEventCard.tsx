@@ -33,6 +33,13 @@ const EVENT_STYLES = {
     labelClass: 'text-red-400',
     defaultExpanded: true,
   },
+  session_stale: {
+    borderClass: 'border-l-orange-500',
+    bgClass: 'bg-orange-950/30',
+    label: 'Session Stale',
+    labelClass: 'text-orange-400',
+    defaultExpanded: true,
+  },
 } as const;
 
 function truncateId(id: string): string {
@@ -90,6 +97,7 @@ function EventBody({ event }: { event: ChildEvent }) {
       return <SessionCompletedBody event={event} />;
     case 'session_ready':
     case 'session_error':
+    case 'session_stale':
       return <SimpleBody text={event.body} />;
   }
 }
