@@ -87,9 +87,11 @@ export function createUsageRoutes(credentialStore: CredentialStore): Router {
       if (apiRes.status === 401) {
         console.warn('[usage] Got 401 from Anthropic API, attempting token refresh...');
         const newToken = await credentialStore.refreshToken();
-        if (newToken) {
-          apiRes = await makeApiRequest(newToken);
+        if (!newToken) {
+          res.status(502).json({ error: 'OAuth token expired and refresh failed. Please re-authenticate via Claude CLI.' });
+          return;
         }
+        apiRes = await makeApiRequest(newToken);
         if (apiRes.status === 401) {
           res.status(502).json({ error: 'OAuth token expired and refresh failed. Please re-authenticate via Claude CLI.' });
           return;

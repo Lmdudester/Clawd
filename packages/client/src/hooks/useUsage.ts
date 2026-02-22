@@ -22,6 +22,7 @@ export function useUsage() {
   }, []);
 
   const refresh = useCallback(() => {
+    if (fetchPromise) return;
     setLoading(true);
     setError(null);
     fetchPromise = api.getUsage();
