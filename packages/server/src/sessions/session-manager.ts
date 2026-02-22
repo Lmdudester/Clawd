@@ -31,6 +31,7 @@ interface ManagedSession {
   managerApiToken: string | null;
   managerContinueTimer: ReturnType<typeof setTimeout> | null;
   managerState: ManagerState | null;
+  pendingManagerEvents: string[];
 }
 
 type SessionEventHandler = (sessionId: string, event: string, data: unknown) => void;
@@ -128,6 +129,7 @@ export class SessionManager {
       managerApiToken: managerMode ? uuid() : null,
       managerContinueTimer: null,
       managerState,
+      pendingManagerEvents: [],
     };
 
     this.sessions.set(id, session);
@@ -357,6 +359,11 @@ export class SessionManager {
         session.pendingApproval = message.approval;
         this.updateStatus(session, 'awaiting_approval');
         this.emit(sessionId, 'approval_request', message.approval);
+
+        // Forward approval request to parent manager if this is a managed child
+        if (session.info.managedBy) {
+          this.forwardApprovalToManager(sessionId, session, message.approval);
+        }
         break;
 
       case 'question':
@@ -382,9 +389,15 @@ export class SessionManager {
           isError: message.isError,
           contextUsage: message.contextUsage,
         });
-        // Auto-continue for manager sessions
+        // For manager sessions: deliver queued events or fall back to auto-continue
         if (session.info.isManager) {
-          this.scheduleManagerContinue(sessionId);
+          if (session.pendingManagerEvents.length > 0) {
+            const events = session.pendingManagerEvents.splice(0);
+            const combined = events.join('\n\n---\n\n');
+            setTimeout(() => this.sendMessage(sessionId, combined), 500);
+          } else {
+            this.scheduleManagerContinue(sessionId);
+          }
         }
         break;
 
@@ -571,9 +584,15 @@ export class SessionManager {
 
     console.log(`[session:${sessionId}] Manager resumed`);
 
-    // If idle, restart the auto-continue loop immediately
+    // If idle, deliver queued events or fall back to auto-continue
     if (session.info.status === 'idle') {
-      this.scheduleManagerContinue(sessionId);
+      if (session.pendingManagerEvents.length > 0) {
+        const events = session.pendingManagerEvents.splice(0);
+        const combined = events.join('\n\n---\n\n');
+        setTimeout(() => this.sendMessage(sessionId, combined), 500);
+      } else {
+        this.scheduleManagerContinue(sessionId);
+      }
     }
   }
 
@@ -717,10 +736,10 @@ export class SessionManager {
   // When a manager goes idle, ping it after a short delay to keep the loop going.
   private scheduleManagerContinue(sessionId: string): void {
     const session = this.sessions.get(sessionId);
-    if (!session || !session.info.isManager) return;
+    if (!session?.info.isManager || !session.managerState) return;
 
     // Do not schedule if paused
-    if (session.managerState?.paused) return;
+    if (session.managerState.paused) return;
 
     // Clear any existing timer
     if (session.managerContinueTimer) {
@@ -728,6 +747,16 @@ export class SessionManager {
       session.managerContinueTimer = null;
     }
 
+    // If any children are actively working, wait for push events instead
+    const childIds = session.managerState.childSessionIds;
+    const anyChildActive = childIds.some(id => {
+      const child = this.sessions.get(id);
+      return child && ['running', 'starting', 'awaiting_approval', 'awaiting_answer'].includes(child.info.status);
+    });
+
+    if (anyChildActive) return; // Wait for push events
+
+    // No active children (setup phase or all done) — auto-continue
     session.managerContinueTimer = setTimeout(() => {
       session.managerContinueTimer = null;
       const s = this.sessions.get(sessionId);
@@ -841,9 +870,81 @@ export class SessionManager {
     return `Begin your independent manager loop. Start with Step 1: create exploration sessions to find ${focusDescription} in this repository. Track all findings as GitHub issues.`;
   }
 
+  // --- Push-based manager event delivery ---
+
+  private forwardApprovalToManager(childId: string, child: ManagedSession, approval: PendingApproval): void {
+    const managerId = child.info.managedBy;
+    if (!managerId) return;
+    const manager = this.sessions.get(managerId);
+    if (!manager?.info.isManager || manager.managerState?.paused) return;
+
+    // Format tool input — truncate large payloads (Write/Edit file contents)
+    const inputStr = JSON.stringify(approval.toolInput, null, 2);
+    const truncatedInput = inputStr.length > 1000
+      ? inputStr.slice(0, 1000) + '\n...(truncated)'
+      : inputStr;
+
+    const reasonBlock = approval.reason
+      ? `\nChild's reasoning:\n${approval.reason.slice(0, 500)}\n`
+      : '';
+
+    const message = `[CHILD APPROVAL REQUEST]
+Session: "${child.info.name}" (ID: ${childId})
+Tool: ${approval.toolName}
+Input:
+${truncatedInput}
+${reasonBlock}
+Review the tool request and the child's reasoning. Approve if on-track, deny with guidance if off-track.
+
+Approval ID: ${approval.id}`;
+
+    this.deliverOrQueueManagerEvent(managerId, manager, message);
+  }
+
+  private notifyManagerOfChildStatus(
+    childId: string, child: ManagedSession,
+    previousStatus: SessionStatus, newStatus: SessionStatus
+  ): void {
+    const managerId = child.info.managedBy;
+    if (!managerId) return;
+    const manager = this.sessions.get(managerId);
+    if (!manager?.info.isManager || manager.managerState?.paused) return;
+
+    let message: string | null = null;
+
+    if (previousStatus === 'starting' && newStatus === 'idle') {
+      message = `[CHILD SESSION READY]\nSession: "${child.info.name}" (ID: ${childId})\nThe session is ready. Send it its instructions via POST /api/sessions/${childId}/message.`;
+    } else if (previousStatus === 'running' && newStatus === 'idle') {
+      message = `[CHILD SESSION COMPLETED]\nSession: "${child.info.name}" (ID: ${childId})\nThe session has finished its work. Read its messages to review results and decide next steps.`;
+    } else if (newStatus === 'error') {
+      message = `[CHILD SESSION ERROR]\nSession: "${child.info.name}" (ID: ${childId})\nThe session encountered an error. Read its messages to investigate.`;
+    }
+
+    if (message) this.deliverOrQueueManagerEvent(managerId, manager, message);
+  }
+
+  private deliverOrQueueManagerEvent(managerId: string, manager: ManagedSession, message: string): void {
+    if (manager.info.status === 'idle') {
+      // Cancel auto-continue since we have a specific event
+      if (manager.managerContinueTimer) {
+        clearTimeout(manager.managerContinueTimer);
+        manager.managerContinueTimer = null;
+      }
+      this.sendMessage(managerId, message);
+    } else {
+      manager.pendingManagerEvents.push(message);
+    }
+  }
+
   private updateStatus(session: ManagedSession, status: SessionStatus): void {
+    const previousStatus = session.info.status;
     session.info.status = status;
     this.emit(session.info.id, 'session_update', session.info);
+
+    // Notify parent manager of significant child status transitions
+    if (session.info.managedBy && previousStatus !== status) {
+      this.notifyManagerOfChildStatus(session.info.id, session, previousStatus, status);
+    }
   }
 
   private addMessage(session: ManagedSession, message: SessionMessage): void {

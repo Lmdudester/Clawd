@@ -104,6 +104,7 @@ export class SDKRunner {
   private config?: ClawdConfig;
   private managerMode: boolean;
   private hasAssistantMessage = false;
+  private lastAssistantReasoning = '';
 
   // Cumulative context tracking
   private cumulativeInputTokens = 0;
@@ -555,6 +556,7 @@ export class SDKRunner {
       id: approvalId,
       toolName,
       toolInput: input,
+      reason: this.lastAssistantReasoning || undefined,
       timestamp: new Date().toISOString(),
     };
 
@@ -657,8 +659,11 @@ export class SDKRunner {
           (b: any) => b.type === 'tool_use'
         );
 
+        // Reset reasoning for this assistant turn, then accumulate text blocks
+        this.lastAssistantReasoning = '';
         for (const block of textBlocks) {
           if ((block as any).text) {
+            this.lastAssistantReasoning += (block as any).text;
             this.hasAssistantMessage = true;
             this.masterClient.send({
               type: 'sdk_message',

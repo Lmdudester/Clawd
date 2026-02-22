@@ -64,6 +64,7 @@ export interface PendingApproval {
   id: string;
   toolName: string;
   toolInput: Record<string, unknown>;
+  reason?: string;
   timestamp: string;
 }
 
