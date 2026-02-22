@@ -565,14 +565,18 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    if (settings.name !== undefined) {
-      session.info.name = settings.name;
-    }
+    // Validate all inputs before applying any changes to avoid partial state updates
     if (settings.permissionMode !== undefined) {
       if (!SessionManager.VALID_PERMISSION_MODES.has(settings.permissionMode)) {
         console.warn(`[session:${sessionId}] Invalid permissionMode: ${settings.permissionMode}`);
         return;
       }
+    }
+
+    if (settings.name !== undefined) {
+      session.info.name = settings.name;
+    }
+    if (settings.permissionMode !== undefined) {
       session.info.permissionMode = settings.permissionMode;
     }
     if (settings.notificationsEnabled !== undefined) {
