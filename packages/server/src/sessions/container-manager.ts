@@ -138,7 +138,17 @@ export class ContainerManager {
       },
     });
 
-    await container.start();
+    try {
+      await container.start();
+    } catch (err) {
+      // Clean up the created container before propagating the error
+      try {
+        await container.remove({ force: true });
+      } catch {
+        // Ignore removal errors
+      }
+      throw err;
+    }
     this.containers.set(cfg.sessionId, container.id);
 
     console.log(`[containers] Container started: ${containerName} (${container.id.slice(0, 12)})`);

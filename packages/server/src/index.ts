@@ -93,14 +93,6 @@ server.on('upgrade', (req, socket, head) => {
   }
 });
 
-// Initialize container manager (async — creates network, prunes stale containers)
-containerManager.initialize().then(() => {
-  console.log('[containers] Container manager initialized');
-}).catch((err) => {
-  console.error('[containers] Failed to initialize container manager:', err.message);
-  console.warn('[containers] Session containers will not work until Docker is available');
-});
-
 // Graceful shutdown — clean up containers and network
 const shutdown = async () => {
   console.log('\nShutting down...');
@@ -111,20 +103,28 @@ const shutdown = async () => {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-server.listen(config.port, config.host, () => {
-  console.log(`\n  Clawd server running on http://${config.host}:${config.port}`);
+// Initialize container manager before accepting requests
+containerManager.initialize().then(() => {
+  console.log('[containers] Container manager initialized');
 
-  // Show LAN URLs
-  if (config.host === '0.0.0.0') {
-    const nets = networkInterfaces();
-    for (const name of Object.keys(nets)) {
-      for (const net of nets[name] ?? []) {
-        if (net.family === 'IPv4' && !net.internal) {
-          console.log(`  LAN: http://${net.address}:${config.port}`);
+  server.listen(config.port, config.host, () => {
+    console.log(`\n  Clawd server running on http://${config.host}:${config.port}`);
+
+    // Show LAN URLs
+    if (config.host === '0.0.0.0') {
+      const nets = networkInterfaces();
+      for (const name of Object.keys(nets)) {
+        for (const net of nets[name] ?? []) {
+          if (net.family === 'IPv4' && !net.internal) {
+            console.log(`  LAN: http://${net.address}:${config.port}`);
+          }
         }
       }
     }
-  }
 
-  console.log('');
+    console.log('');
+  });
+}).catch((err) => {
+  console.error('[containers] Failed to initialize container manager:', err.message);
+  console.warn('[containers] Session containers will not work until Docker is available');
 });
