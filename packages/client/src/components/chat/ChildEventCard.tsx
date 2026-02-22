@@ -46,9 +46,16 @@ function truncateId(id: string): string {
   return id.length > 12 ? id.slice(0, 12) + '...' : id;
 }
 
+function getDefaultExpanded(event: ChildEvent): boolean {
+  const style = EVENT_STYLES[event.kind];
+  // Collapse completed events with large output to avoid wall-of-text
+  if (event.kind === 'session_completed' && event.childOutput.length > 2000) return false;
+  return style.defaultExpanded;
+}
+
 function SingleEventCard({ event }: { event: ChildEvent }) {
   const style = EVENT_STYLES[event.kind];
-  const [expanded, setExpanded] = useState(style.defaultExpanded);
+  const [expanded, setExpanded] = useState(() => getDefaultExpanded(event));
 
   return (
     <div

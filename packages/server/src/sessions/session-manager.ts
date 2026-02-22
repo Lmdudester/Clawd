@@ -963,30 +963,14 @@ Approval ID: ${approval.id}`;
     if (message) this.deliverOrQueueManagerEvent(managerId, manager, message);
   }
 
-  // Extract the last few assistant messages from a child session for inline delivery.
+  // Extract assistant messages from a child session for inline delivery.
   private getChildResultSummary(childId: string): string {
     const child = this.sessions.get(childId);
     if (!child) return '(session not found)';
 
-    // Grab the last assistant messages (skip system, user, error, tool_call, tool_result)
-    const relevant = child.messages.filter(m => m.type === 'assistant');
-
-    // Take the last few messages, truncating to ~2000 chars total
-    const maxChars = 2000;
-    const parts: string[] = [];
-    let totalLen = 0;
-
-    for (let i = relevant.length - 1; i >= 0 && totalLen < maxChars; i--) {
-      const content = relevant[i].content;
-      const remaining = maxChars - totalLen;
-      if (content.length <= remaining) {
-        parts.unshift(content);
-        totalLen += content.length;
-      } else {
-        parts.unshift('...' + content.slice(content.length - remaining));
-        totalLen = maxChars;
-      }
-    }
+    const parts = child.messages
+      .filter(m => m.type === 'assistant')
+      .map(m => m.content);
 
     return parts.length > 0 ? parts.join('\n\n') : '(no output captured)';
   }
