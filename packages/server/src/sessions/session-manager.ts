@@ -249,6 +249,10 @@ export class SessionManager {
   registerAgentConnection(sessionId: string, ws: WebSocket): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+    if (session.agentWs && session.agentWs !== ws) {
+      console.warn(`[session:${sessionId}] Replacing existing agent WebSocket — closing old connection`);
+      session.agentWs.close();
+    }
     session.agentWs = ws;
     console.log(`[session:${sessionId}] Agent WebSocket registered`);
   }

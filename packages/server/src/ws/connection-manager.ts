@@ -30,7 +30,11 @@ export class ConnectionManager {
     const data = JSON.stringify(message);
     for (const client of this.clients.values()) {
       if (client.subscriptions.has(sessionId) && client.ws.readyState === 1) {
-        client.ws.send(data);
+        try {
+          client.ws.send(data);
+        } catch {
+          // WebSocket transitioned from OPEN to CLOSING between the check and send — safe to ignore
+        }
       }
     }
   }
@@ -40,7 +44,11 @@ export class ConnectionManager {
     const data = JSON.stringify(message);
     for (const client of this.clients.values()) {
       if (client.ws.readyState === 1) {
-        client.ws.send(data);
+        try {
+          client.ws.send(data);
+        } catch {
+          // WebSocket transitioned from OPEN to CLOSING between the check and send — safe to ignore
+        }
       }
     }
   }
@@ -50,7 +58,11 @@ export class ConnectionManager {
     const data = JSON.stringify(message);
     for (const client of this.clients.values()) {
       if (client.username === username && client.ws.readyState === 1) {
-        client.ws.send(data);
+        try {
+          client.ws.send(data);
+        } catch {
+          // WebSocket transitioned from OPEN to CLOSING between the check and send — safe to ignore
+        }
       }
     }
   }
