@@ -419,7 +419,7 @@ export class SDKRunner {
             // Auto-edits: approve file mutations within CWD
             if (this.permissionMode === 'auto_edits') {
               const filePath = this.getEditFilePathForApproval(toolName, input);
-              const resolvedFile = filePath ? path.resolve(filePath) : null;
+              const resolvedFile = filePath ? path.resolve(this.cwd, filePath) : null;
               const resolvedCwd = path.resolve(this.cwd);
               if (resolvedFile && resolvedFile.startsWith(resolvedCwd + '/')) {
                 console.log(`[agent] auto-edit approved: ${toolName}`);
