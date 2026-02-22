@@ -57,4 +57,10 @@ export const ToolGroup = memo(function ToolGroup({ messages }: Props) {
       })}
     </div>
   );
+}, (prev, next) => {
+  if (prev.messages.length !== next.messages.length) return false;
+  for (let i = 0; i < prev.messages.length; i++) {
+    if (prev.messages[i].id !== next.messages[i].id) return false;
+  }
+  return true;
 });
