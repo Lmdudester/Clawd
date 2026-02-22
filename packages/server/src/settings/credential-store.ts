@@ -298,27 +298,31 @@ export class CredentialStore {
   }
 
   private writeRefreshedCredentials(
-    existing: ClaudeCredentials,
+    _existing: ClaudeCredentials,
     oauthResponse: { access_token: string; refresh_token?: string; expires_in?: number },
   ): void {
     if (!this.storedAuth) return;
 
     const credFile = join(this.storedAuth.claudeDir, '.credentials.json');
 
-    if (!existing.claudeAiOauth) existing.claudeAiOauth = {};
-    existing.claudeAiOauth.accessToken = oauthResponse.access_token;
+    // Re-read the credentials file immediately before writing to avoid TOCTOU:
+    // another process may have modified the file while the refresh request was in-flight.
+    const freshCreds = this.readCredentials() ?? {};
+
+    if (!freshCreds.claudeAiOauth) freshCreds.claudeAiOauth = {};
+    freshCreds.claudeAiOauth.accessToken = oauthResponse.access_token;
 
     // Update refresh token if a new one was issued (rotation)
     if (oauthResponse.refresh_token) {
-      existing.claudeAiOauth.refreshToken = oauthResponse.refresh_token;
+      freshCreds.claudeAiOauth.refreshToken = oauthResponse.refresh_token;
     }
 
     // Calculate and store expiry time (expiresAt is Unix ms)
     if (oauthResponse.expires_in) {
-      existing.claudeAiOauth.expiresAt = Date.now() + oauthResponse.expires_in * 1000;
+      freshCreds.claudeAiOauth.expiresAt = Date.now() + oauthResponse.expires_in * 1000;
     }
 
-    writeFileSync(credFile, JSON.stringify(existing, null, 2));
+    writeFileSync(credFile, JSON.stringify(freshCreds, null, 2));
     console.log(`[credentials] Updated credentials file: ${credFile}`);
   }
 
