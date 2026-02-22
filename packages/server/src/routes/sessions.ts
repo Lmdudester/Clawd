@@ -59,15 +59,23 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     }
 
     try {
-      const createdBy = req.user?.username ?? 'unknown';
+      // When created by a manager, inherit the manager's owner so children
+      // appear in the same user's session list.
+      let createdBy = req.user?.username ?? 'unknown';
+      let managerId: string | null = null;
+      if (req.managerApiToken) {
+        managerId = sessionManager.findManagerByToken(req.managerApiToken);
+        if (managerId) {
+          const manager = sessionManager.getSession(managerId);
+          if (manager) createdBy = manager.info.createdBy;
+        }
+      }
+
       const session = await sessionManager.createSession(sanitizedName, repoUrl, branch, !!dockerAccess, !!managerMode, createdBy);
 
-      // Auto-link child to parent manager if created via manager API token
-      if (req.managerApiToken) {
-        const managerId = sessionManager.findManagerByToken(req.managerApiToken);
-        if (managerId) {
-          sessionManager.trackChildSession(managerId, session.id);
-        }
+      // Auto-link child to parent manager
+      if (managerId) {
+        sessionManager.trackChildSession(managerId, session.id);
       }
 
       res.status(201).json({ session });
