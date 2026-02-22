@@ -42,3 +42,7 @@ export const config = {
   // Project repos config file path
   projectReposPath: process.env.PROJECT_REPOS_PATH || resolve(projectRoot, 'project-repos.json'),
 };
+
+if (!process.env.JWT_SECRET) {
+  console.warn('[config] WARNING: JWT_SECRET is not set. Using a random secret — all sessions will be invalidated on server restart. Set JWT_SECRET in your .env for persistent authentication.');
+}

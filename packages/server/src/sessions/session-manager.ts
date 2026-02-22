@@ -578,7 +578,12 @@ export class SessionManager {
     }
 
     if (settings.name !== undefined) {
-      session.info.name = settings.name;
+      const cleaned = settings.name.replace(/[\x00-\x1F\x7F]/g, '').trim();
+      if (!cleaned || cleaned.length > 100) {
+        console.warn(`[session:${sessionId}] Invalid session name update rejected`);
+      } else {
+        session.info.name = cleaned;
+      }
     }
     if (settings.permissionMode !== undefined) {
       session.info.permissionMode = settings.permissionMode;

@@ -3,6 +3,13 @@ import { authMiddleware, type AuthRequest } from '../auth/middleware.js';
 import type { SessionManager } from '../sessions/session-manager.js';
 import type { CreateSessionRequest, SendMessageRequest, UpdateManagerStepRequest, ErrorResponse, ManagerStep } from '@clawd/shared';
 
+/** Strip control characters and enforce length limit on session names. */
+function sanitizeSessionName(name: string): string | null {
+  const cleaned = name.replace(/[\x00-\x1F\x7F]/g, '').trim();
+  if (!cleaned || cleaned.length > 100) return null;
+  return cleaned;
+}
+
 /** Check if the authenticated user owns the session (or is a manager API token). */
 function isSessionOwner(req: AuthRequest, sessionCreatedBy: string): boolean {
   // Manager API tokens are authorized for sessions they manage
@@ -27,9 +34,9 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   router.post('/', async (req: AuthRequest, res) => {
     const { name, repoUrl, branch, dockerAccess, managerMode } = req.body as CreateSessionRequest;
 
-    if (!name?.trim() || !repoUrl || !branch) {
-      const error: ErrorResponse = { error: 'Name, repoUrl, and branch are required' };
-      res.status(400).json(error);
+    const sanitizedName = name ? sanitizeSessionName(name) : null;
+    if (!sanitizedName || !repoUrl || !branch) {
+      res.status(400).json({ error: 'Name (1-100 chars), repoUrl, and branch are required' } as ErrorResponse);
       return;
     }
 
@@ -48,7 +55,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
 
     try {
       const createdBy = req.user?.username ?? 'unknown';
-      const session = await sessionManager.createSession(name, repoUrl, branch, !!dockerAccess, !!managerMode, createdBy);
+      const session = await sessionManager.createSession(sanitizedName, repoUrl, branch, !!dockerAccess, !!managerMode, createdBy);
 
       // Auto-link child to parent manager if created via manager API token
       if (req.managerApiToken) {
