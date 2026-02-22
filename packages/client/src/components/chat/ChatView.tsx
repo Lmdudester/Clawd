@@ -170,16 +170,6 @@ export function ChatView() {
           {session?.managedBy && (
             <span className="inline-block text-xs font-semibold text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0">Managed</span>
           )}
-          {session?.managerState && (
-            <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0 capitalize">
-              {session.managerState.currentStep}
-            </span>
-          )}
-          {session?.managerState && session.managerState.childSessionIds.length > 0 && (
-            <span className="inline-block text-xs text-slate-400 mr-2 shrink-0">
-              {session.managerState.childSessionIds.length} child{session.managerState.childSessionIds.length !== 1 ? 'ren' : ''}
-            </span>
-          )}
           {session?.isManager && session?.status !== 'terminated' && session?.status !== 'error' && (
             <button
               onClick={isManagerPaused ? handleResumeManager : handlePauseManager}
@@ -260,10 +250,21 @@ export function ChatView() {
           isManagerPaused
             ? 'bg-amber-500/10 border-t border-amber-500/20 text-amber-300'
             : 'bg-purple-500/10 border-t border-purple-500/20 text-purple-300'
-        } text-xs font-medium text-center shrink-0`}>
-          {isManagerPaused
-            ? 'Manager session paused — auto-continue is suspended'
-            : 'Autonomous manager session — messages will guide the orchestration loop'}
+        } text-xs font-medium shrink-0 flex items-center justify-center gap-3`}>
+          {session.managerState && (
+            <span className="font-semibold capitalize">
+              {session.managerState.currentStep}
+            </span>
+          )}
+          {session.managerState && session.managerState.childSessionIds.length > 0 && (
+            <span className="text-slate-400">
+              {session.managerState.childSessionIds.length} child{session.managerState.childSessionIds.length !== 1 ? 'ren' : ''}
+            </span>
+          )}
+          <span className="text-slate-500">—</span>
+          <span>{isManagerPaused
+            ? 'Paused — auto-continue is suspended'
+            : 'Autonomous manager — messages guide the orchestration loop'}</span>
         </div>
       )}
 

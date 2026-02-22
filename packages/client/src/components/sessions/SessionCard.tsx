@@ -100,23 +100,6 @@ export function SessionCard({ session }: { session: SessionInfo }) {
           </button>
         </div>
       </div>
-      {session.managerState && (
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded capitalize">
-            {session.managerState.currentStep}
-          </span>
-          {session.managerState.childSessionIds.length > 0 && (
-            <span className="text-xs text-slate-400">
-              {session.managerState.childSessionIds.length} child session{session.managerState.childSessionIds.length !== 1 ? 's' : ''}
-            </span>
-          )}
-          {session.managerState.paused && (
-            <span className="text-xs font-semibold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded">
-              Paused
-            </span>
-          )}
-        </div>
-      )}
       {session.lastMessagePreview && (
         <p className="text-base text-slate-400 truncate">{stripMarkdown(session.lastMessagePreview)}</p>
       )}
