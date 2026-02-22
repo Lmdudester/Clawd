@@ -29,6 +29,8 @@ export function useWebSocketProvider(): { send: SendFn } {
   const clearSessionStreamTokens = useSessionStore((s) => s.clearSessionStreamTokens);
   const setPendingApproval = useSessionStore((s) => s.setPendingApproval);
   const setPendingQuestion = useSessionStore((s) => s.setPendingQuestion);
+  const clearAllPendingApprovals = useSessionStore((s) => s.clearAllPendingApprovals);
+  const clearAllPendingQuestions = useSessionStore((s) => s.clearAllPendingQuestions);
   const setAvailableModels = useSessionStore((s) => s.setAvailableModels);
   const addNotification = useNotificationStore((s) => s.addNotification);
 
@@ -104,6 +106,10 @@ export function useWebSocketProvider(): { send: SendFn } {
 
     ws.onclose = () => {
       wsRef.current = null;
+      // Clear stale pending approvals/questions — on reconnection + re-subscribe
+      // the server will re-send any still-valid ones.
+      clearAllPendingApprovals();
+      clearAllPendingQuestions();
       const delay = getReconnectDelay(reconnectAttempt.current);
       reconnectAttempt.current++;
       reconnectTimer.current = setTimeout(connect, delay);
@@ -112,7 +118,7 @@ export function useWebSocketProvider(): { send: SendFn } {
     ws.onerror = () => {
       ws.close();
     };
-  }, [token, logout, updateSession, addMessages, appendStreamToken, clearStreamTokens, clearSessionStreamTokens, setPendingApproval, setPendingQuestion, setAvailableModels, addNotification]);
+  }, [token, logout, updateSession, addMessages, appendStreamToken, clearStreamTokens, clearSessionStreamTokens, setPendingApproval, setPendingQuestion, clearAllPendingApprovals, clearAllPendingQuestions, setAvailableModels, addNotification]);
 
   useEffect(() => {
     connect();

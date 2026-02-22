@@ -399,12 +399,30 @@ export class SessionManager {
       console.warn(`[session:${sessionId}] Cannot send to agent: no WebSocket (message type: ${message.type})`);
       return;
     }
-    session.agentWs.send(JSON.stringify(message));
+    try {
+      session.agentWs.send(JSON.stringify(message));
+    } catch (err) {
+      console.error(`[session:${sessionId}] Failed to send to agent (message type: ${message.type}):`, err);
+      this.updateStatus(session, 'error');
+      this.addMessage(session, {
+        id: uuid(),
+        sessionId,
+        type: 'error',
+        content: `Failed to send message to session agent: ${(err as Error).message || 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 
   sendMessage(sessionId: string, content: string): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+
+    const { status } = session.info;
+    if (status === 'terminated' || status === 'error') {
+      console.warn(`[session:${sessionId}] Cannot send message: session is ${status}`);
+      return;
+    }
 
     // Store user message locally
     this.addMessage(session, {
@@ -421,6 +439,13 @@ export class SessionManager {
   approveToolUse(sessionId: string, approvalId: string, allow: boolean, message?: string): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+
+    const { status } = session.info;
+    if (status === 'terminated' || status === 'error') {
+      console.warn(`[session:${sessionId}] Cannot approve tool: session is ${status}`);
+      return;
+    }
+
     session.pendingApproval = null;
     this.sendToAgent(sessionId, { type: 'approval_response', approvalId, allow, message });
   }
@@ -428,6 +453,12 @@ export class SessionManager {
   answerQuestion(sessionId: string, questionId: string, answers: Record<string, string>): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+
+    const { status } = session.info;
+    if (status === 'terminated' || status === 'error') {
+      console.warn(`[session:${sessionId}] Cannot answer question: session is ${status}`);
+      return;
+    }
 
     // Intercept server-generated onboarding questions for manager sessions
     if (session.pendingQuestion?.id === questionId && session.info.isManager && !session.managerState?.preferences) {
