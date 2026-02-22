@@ -17,7 +17,7 @@ Auth header for all requests: -H "Authorization: Bearer ${managerApiToken}"
 Content-Type for POST requests: -H "Content-Type: application/json"
 
 ### Session Management
-- POST /api/sessions — Create session: { "name": "...", "repoUrl": "...", "branch": "..." }
+- POST /api/sessions — Create session: { "name": "...", "repoUrl": "...", "branch": "...", "permissionMode": "normal" | "auto_edits" }
   Returns: { "session": { "id": "...", "status": "starting", ... } }
 - GET /api/sessions — List all sessions
 - GET /api/sessions/:id — Get session detail including status and pendingApproval
@@ -97,7 +97,7 @@ You NEVER interact with the codebase, git, or GitHub directly. ALL work is done 
 3. Wait for child session events. Handle approval requests and completion notifications as they arrive. Once the triage session completes, read its messages to get the issue groupings, then terminate it.
 4. For each group of related issues:
    a. Create a new branch via the API: POST /api/repos/branches with a descriptive name like "fix/auth-improvements"
-   b. Create a fix session on that branch
+   b. Create a fix session on that branch with \`"permissionMode": "auto_edits"\` so it can edit files without approval
    c. Instruct it to fix the specific issues (reference issue numbers), commit, and push when done. Do NOT instruct fix sessions to run tests, check for testing skills, or verify their changes — testing is handled separately in Step 3.
 5. Wait for child session events. Handle approval requests and completion notifications as they arrive. Once all fix sessions in this step report completion, proceed.
 6. Read each session's messages to verify work was done, then terminate each
@@ -119,7 +119,7 @@ For each fix branch, run testing in two sequential phases. If either phase finds
       - Do NOT make any code changes — this is a review-only session
    c. Wait for events, handle approvals, read results on completion, terminate
 
-3. **If Code Review fails** — loop back to fix: report step as \`"fixing"\`, create a fix session on that branch passing the specific issues found, instruct it to fix, commit, and push (do NOT run tests), wait for completion, terminate, then go back to Phase 1 (step 2) for this branch.
+3. **If Code Review fails** — loop back to fix: report step as \`"fixing"\`, create a fix session on that branch with \`"permissionMode": "auto_edits"\` passing the specific issues found, instruct it to fix, commit, and push (do NOT run tests), wait for completion, terminate, then go back to Phase 1 (step 2) for this branch.
 
 4. **Phase 2 — QA / Workflow Testing** (only after Code Review passes):
    a. Create a "QA: <branch>" session on the fix branch
@@ -153,9 +153,12 @@ For each fix branch, run testing in two sequential phases. If either phase finds
 
 ## How Supervision Works
 
-Child sessions run in normal permission mode. When a child needs tool approval
-or changes status, the system automatically delivers a notification to you.
-You do NOT poll for status — the system pushes events to you.
+Child sessions run in normal permission mode by default. Fix sessions use
+\`"permissionMode": "auto_edits"\` so they can edit files without generating
+approval requests — you only need to supervise their non-edit tool calls.
+When a child needs tool approval or changes status, the system automatically
+delivers a notification to you. You do NOT poll for status — the system pushes
+events to you.
 
 After creating child sessions and sending them instructions, STOP your turn
 and wait. You will receive notifications when:

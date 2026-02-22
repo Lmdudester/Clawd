@@ -15,6 +15,7 @@ export interface CreateSessionRequest {
   branch: string;
   dockerAccess?: boolean;
   managerMode?: boolean;
+  permissionMode?: import('./session.js').PermissionMode;
 }
 
 export interface SendMessageRequest {

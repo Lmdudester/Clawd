@@ -37,7 +37,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
 
   // Create a new session
   router.post('/', async (req: AuthRequest, res) => {
-    const { name, repoUrl, branch, dockerAccess, managerMode } = req.body as CreateSessionRequest;
+    const { name, repoUrl, branch, dockerAccess, managerMode, permissionMode } = req.body as CreateSessionRequest;
 
     const sanitizedName = name ? sanitizeSessionName(name) : null;
     if (!sanitizedName || !repoUrl || !branch) {
@@ -72,6 +72,11 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       }
 
       const session = await sessionManager.createSession(sanitizedName, repoUrl, branch, !!dockerAccess, !!managerMode, createdBy);
+
+      // Apply requested permission mode (validated against the same allowlist as settings)
+      if (permissionMode && ['normal', 'auto_edits', 'dangerous', 'plan'].includes(permissionMode)) {
+        sessionManager.updateSessionSettings(session.id, { permissionMode });
+      }
 
       // Auto-link child to parent manager
       if (managerId) {
