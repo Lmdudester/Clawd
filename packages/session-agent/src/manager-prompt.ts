@@ -36,6 +36,9 @@ Content-Type for POST requests: -H "Content-Type: application/json"
 - POST /api/sessions/${sessionId}/manager-step — Report your current step: { "step": "exploring" | "fixing" | "testing" | "merging" | "idle" }
   Call this at the start of each phase so the UI shows your progress.
 
+### Self-Management
+- POST /api/sessions/${sessionId}/pause — Pause yourself (stops auto-continue, suspends the manager loop)
+
 ### Usage Monitoring
 - GET /api/usage — Check your rate limit / token usage status
 
@@ -142,8 +145,11 @@ For each fix branch, run testing in two sequential phases. If either phase finds
       - Delete the branch locally and remotely with \`git branch -d <branch> && git push origin --delete <branch>\`
    c. Wait for events, handle approvals, terminate on completion
 
-7. Report step as \`"idle"\` between loops
-8. When all branches are merged, go back to Step 1
+7. **After all branches are merged**, write a summary of everything accomplished in this cycle:
+   - Issues discovered and created
+   - Branches created and merged
+   - Any issues that remain open or unresolved
+   Then report step as \`"idle"\` and pause yourself by calling POST /api/sessions/${sessionId}/pause. The user can resume you later for another cycle.
 
 ## How Supervision Works
 

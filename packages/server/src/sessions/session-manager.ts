@@ -770,16 +770,12 @@ export class SessionManager {
       session.managerContinueTimer = null;
     }
 
-    // If any children are actively working, wait for push events instead
+    // If any live children exist, wait for push events instead of auto-continuing.
+    // untrackChildSession() removes terminated children, so any remaining entries are live.
     const childIds = session.managerState.childSessionIds;
-    const anyChildActive = childIds.some(id => {
-      const child = this.sessions.get(id);
-      return child && ['running', 'starting', 'awaiting_approval', 'awaiting_answer'].includes(child.info.status);
-    });
+    if (childIds.length > 0) return;
 
-    if (anyChildActive) return; // Wait for push events
-
-    // No active children (setup phase or all done) — auto-continue
+    // No live children (setup phase or all done) — auto-continue
     session.managerContinueTimer = setTimeout(() => {
       session.managerContinueTimer = null;
       const s = this.sessions.get(sessionId);
@@ -938,12 +934,41 @@ Approval ID: ${approval.id}`;
     if (previousStatus === 'starting' && newStatus === 'idle') {
       message = `[CHILD SESSION READY]\nSession: "${child.info.name}" (ID: ${childId})\nThe session is ready. Send it its instructions via POST /api/sessions/${childId}/message.`;
     } else if (previousStatus === 'running' && newStatus === 'idle') {
-      message = `[CHILD SESSION COMPLETED]\nSession: "${child.info.name}" (ID: ${childId})\nThe session has finished its work. Read its messages to review results and decide next steps.`;
+      const resultSummary = this.getChildResultSummary(childId);
+      message = `[CHILD SESSION COMPLETED]\nSession: "${child.info.name}" (ID: ${childId})\nThe session has finished its work.\n\n--- Child Output ---\n${resultSummary}\n--- End Child Output ---\n\nDecide next steps based on the output above.`;
     } else if (newStatus === 'error') {
       message = `[CHILD SESSION ERROR]\nSession: "${child.info.name}" (ID: ${childId})\nThe session encountered an error. Read its messages to investigate.`;
     }
 
     if (message) this.deliverOrQueueManagerEvent(managerId, manager, message);
+  }
+
+  // Extract the last few assistant messages from a child session for inline delivery.
+  private getChildResultSummary(childId: string): string {
+    const child = this.sessions.get(childId);
+    if (!child) return '(session not found)';
+
+    // Grab the last assistant messages (skip system, user, error, tool_call, tool_result)
+    const relevant = child.messages.filter(m => m.type === 'assistant');
+
+    // Take the last few messages, truncating to ~2000 chars total
+    const maxChars = 2000;
+    const parts: string[] = [];
+    let totalLen = 0;
+
+    for (let i = relevant.length - 1; i >= 0 && totalLen < maxChars; i--) {
+      const content = relevant[i].content;
+      const remaining = maxChars - totalLen;
+      if (content.length <= remaining) {
+        parts.unshift(content);
+        totalLen += content.length;
+      } else {
+        parts.unshift('...' + content.slice(content.length - remaining));
+        totalLen = maxChars;
+      }
+    }
+
+    return parts.length > 0 ? parts.join('\n\n') : '(no output captured)';
   }
 
   private deliverOrQueueManagerEvent(managerId: string, manager: ManagedSession, message: string): void {
