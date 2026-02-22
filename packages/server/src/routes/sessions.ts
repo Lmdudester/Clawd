@@ -82,6 +82,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       session: session.info,
       messages: sessionManager.getMessages(id),
       pendingApproval: session.pendingApproval ?? null,
+      pendingQuestion: session.pendingQuestion ?? null,
     });
   });
 

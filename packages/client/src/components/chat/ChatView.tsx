@@ -44,6 +44,8 @@ export function ChatView() {
     api.getSession(id).then((res) => {
       updateSession(res.session);
       setMessages(id, res.messages);
+      if (res.pendingApproval) setPendingApproval(id, res.pendingApproval);
+      if (res.pendingQuestion) setPendingQuestion(id, res.pendingQuestion);
     }).catch((err) => {
       if (err.message === 'Session not found') {
         setSessionNotFound(true);
@@ -72,7 +74,7 @@ export function ChatView() {
       send({ type: 'unsubscribe', sessionId: id });
       setCurrentSession(null);
     };
-  }, [id, send, setCurrentSession, setMessages, updateSession]);
+  }, [id, send, setCurrentSession, setMessages, updateSession, setPendingApproval, setPendingQuestion]);
 
   const handleSend = useCallback((content: string) => {
     if (!id) return;
