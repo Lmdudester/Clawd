@@ -24,6 +24,14 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
 
   const addSession = useSessionStore((s) => s.addSession);
   const navigate = useNavigate();
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    if (open) {
+      mountedRef.current = true;
+      return () => { mountedRef.current = false; };
+    }
+  }, [open]);
 
   const resetForm = useCallback(() => {
     setName('');
@@ -59,6 +67,7 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
     setNewBranchName('');
     api.getBranches(url)
       .then((res) => {
+        if (!mountedRef.current) return;
         setBranches(res.branches);
         // Pre-select the default branch if it exists in the list
         if (defaultBranch && res.branches.includes(defaultBranch)) {
@@ -68,15 +77,19 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
         }
       })
       .catch(() => {
+        if (!mountedRef.current) return;
         setBranches([]);
       })
-      .finally(() => setBranchesLoading(false));
+      .finally(() => {
+        if (mountedRef.current) setBranchesLoading(false);
+      });
   }, []);
 
   useEffect(() => {
     if (!open) return;
     api.getProjectRepos()
       .then((res) => {
+        if (!mountedRef.current) return;
         setRepos(res.repos);
         const defaultIdx = res.repos.findIndex((r: ProjectRepo) => r.isDefault);
         if (defaultIdx >= 0) {

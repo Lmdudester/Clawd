@@ -30,9 +30,12 @@ export function SessionCard({ session }: { session: SessionInfo }) {
   };
 
   return (
-    <button
+    <div
+      role="link"
+      tabIndex={0}
       onClick={() => navigate(`/session/${session.id}`)}
-      className="w-full text-left p-4 bg-blue-950/25 hover:bg-blue-950/40 border border-blue-900/25 rounded-xl transition-colors"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/session/${session.id}`); } }}
+      className="w-full text-left p-4 bg-blue-950/25 hover:bg-blue-950/40 border border-blue-900/25 rounded-xl transition-colors cursor-pointer"
     >
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-lg font-medium text-white truncate">
@@ -105,6 +108,6 @@ export function SessionCard({ session }: { session: SessionInfo }) {
         </div>
         <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded">{new Date(session.createdAt).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
       </div>
-    </button>
+    </div>
   );
 }
