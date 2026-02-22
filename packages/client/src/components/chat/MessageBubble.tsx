@@ -30,6 +30,26 @@ export function MessageBubble({ message }: { message: SessionMessage }) {
 
   const isUser = message.type === 'user';
 
+  if (isUser && message.source === 'child_event') {
+    return (
+      <div className="flex justify-end mx-4 my-2">
+        <div className="max-w-[85%] px-4 py-2.5 rounded-2xl text-base leading-relaxed bg-purple-600/20 border border-purple-500/30 text-purple-100 rounded-br-md">
+          <MarkdownRenderer content={message.content} />
+        </div>
+      </div>
+    );
+  }
+
+  if (isUser && message.source === 'auto_continue') {
+    return (
+      <div className="flex justify-end mx-4 my-2">
+        <div className="max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed bg-slate-700/50 border border-slate-600/30 text-slate-400 italic rounded-br-md">
+          <p className="whitespace-pre-wrap">{message.content}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mx-4 my-2`}>
       <div

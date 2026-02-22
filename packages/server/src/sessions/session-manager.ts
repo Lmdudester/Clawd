@@ -411,7 +411,7 @@ export class SessionManager {
           if (session.pendingManagerEvents.length > 0) {
             const events = session.pendingManagerEvents.splice(0);
             const combined = events.join('\n\n---\n\n');
-            setTimeout(() => this.sendMessage(sessionId, combined), 500);
+            setTimeout(() => this.sendMessage(sessionId, combined, 'child_event'), 500);
           } else {
             this.scheduleManagerContinue(sessionId);
           }
@@ -470,7 +470,7 @@ export class SessionManager {
     }
   }
 
-  sendMessage(sessionId: string, content: string): void {
+  sendMessage(sessionId: string, content: string, source?: SessionMessage['source']): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
@@ -487,6 +487,7 @@ export class SessionManager {
       type: 'user',
       content,
       timestamp: new Date().toISOString(),
+      ...(source && { source }),
     });
 
     this.sendToAgent(sessionId, { type: 'user_message', content });
@@ -606,7 +607,7 @@ export class SessionManager {
       if (session.pendingManagerEvents.length > 0) {
         const events = session.pendingManagerEvents.splice(0);
         const combined = events.join('\n\n---\n\n');
-        setTimeout(() => this.sendMessage(sessionId, combined), 500);
+        setTimeout(() => this.sendMessage(sessionId, combined, 'child_event'), 500);
       } else {
         this.scheduleManagerContinue(sessionId);
       }
@@ -790,7 +791,7 @@ export class SessionManager {
         : '';
 
       console.log(`[session:${sessionId}] Auto-continuing manager session`);
-      this.sendMessage(sessionId, `Continue your manager loop. Check on child sessions and proceed with the next step.${focusReminder}`);
+      this.sendMessage(sessionId, `Continue your manager loop. Check on child sessions and proceed with the next step.${focusReminder}`, 'auto_continue');
     }, 3000);
   }
 
@@ -870,7 +871,7 @@ export class SessionManager {
 
     const initialMessage = this.buildManagerInitialMessage(preferences);
     setTimeout(() => {
-      this.sendMessage(sessionId, initialMessage);
+      this.sendMessage(sessionId, initialMessage, 'auto_continue');
     }, 500);
   }
 
@@ -978,7 +979,7 @@ Approval ID: ${approval.id}`;
         clearTimeout(manager.managerContinueTimer);
         manager.managerContinueTimer = null;
       }
-      this.sendMessage(managerId, message);
+      this.sendMessage(managerId, message, 'child_event');
     } else {
       manager.pendingManagerEvents.push(message);
     }

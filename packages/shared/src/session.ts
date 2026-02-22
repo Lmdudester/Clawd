@@ -58,6 +58,7 @@ export interface SessionMessage {
   toolInput?: Record<string, unknown>;
   timestamp: string;
   isStreaming?: boolean;
+  source?: 'child_event' | 'auto_continue';
 }
 
 export interface PendingApproval {
