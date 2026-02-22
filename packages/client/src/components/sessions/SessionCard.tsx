@@ -7,10 +7,13 @@ import { api } from '../../lib/api';
 import { MODE_THEME } from '../../lib/mode-theme';
 
 const MANAGER_STAGE: Record<ManagerStep, { label: string; text: string; bg: string; border: string }> = {
-  idle:      { label: 'Manager',   text: 'text-purple-300',  bg: 'bg-purple-500/20', border: 'border-purple-500/30' },
-  exploring: { label: 'Exploring', text: 'text-blue-300',    bg: 'bg-blue-500/20',   border: 'border-blue-500/30' },
-  fixing:    { label: 'Fixing',    text: 'text-cyan-300',    bg: 'bg-cyan-500/20',   border: 'border-cyan-500/30' },
-  testing:   { label: 'Testing',   text: 'text-green-300',   bg: 'bg-green-500/20',  border: 'border-green-500/30' },
+  idle:      { label: 'Manager',   text: 'text-purple-300',  bg: 'bg-purple-500/20',  border: 'border-purple-500/30' },
+  exploring: { label: 'Exploring', text: 'text-blue-300',    bg: 'bg-blue-500/20',    border: 'border-blue-500/30' },
+  triaging:  { label: 'Triaging',  text: 'text-violet-300',  bg: 'bg-violet-500/20',  border: 'border-violet-500/30' },
+  planning:  { label: 'Planning',  text: 'text-indigo-300',  bg: 'bg-indigo-500/20',  border: 'border-indigo-500/30' },
+  reviewing: { label: 'Reviewing', text: 'text-sky-300',     bg: 'bg-sky-500/20',     border: 'border-sky-500/30' },
+  fixing:    { label: 'Fixing',    text: 'text-cyan-300',    bg: 'bg-cyan-500/20',    border: 'border-cyan-500/30' },
+  testing:   { label: 'Testing',   text: 'text-green-300',   bg: 'bg-green-500/20',   border: 'border-green-500/30' },
   merging:   { label: 'Merging',   text: 'text-emerald-300', bg: 'bg-emerald-500/20', border: 'border-emerald-500/30' },
 };
 

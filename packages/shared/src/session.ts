@@ -11,13 +11,14 @@ export type SessionStatus =
   | 'error'
   | 'terminated';
 
-export type ManagerStep = 'idle' | 'exploring' | 'fixing' | 'testing' | 'merging';
+export type ManagerStep = 'idle' | 'exploring' | 'triaging' | 'planning' | 'reviewing' | 'fixing' | 'testing' | 'merging';
 
 export type ManagerFocus = 'bugs' | 'enhancements' | 'both';
 
 export interface ManagerPreferences {
   focus: ManagerFocus;
   skipExploration: boolean;
+  requirePlanApproval: boolean;
 }
 
 export interface ManagerState {

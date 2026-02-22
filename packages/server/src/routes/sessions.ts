@@ -192,7 +192,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     }
 
     const { step } = req.body as UpdateManagerStepRequest;
-    const validSteps: ManagerStep[] = ['idle', 'exploring', 'fixing', 'testing', 'merging'];
+    const validSteps: ManagerStep[] = ['idle', 'exploring', 'triaging', 'planning', 'reviewing', 'fixing', 'testing', 'merging'];
     if (!step || !validSteps.includes(step)) {
       res.status(400).json({ error: `Invalid step. Must be one of: ${validSteps.join(', ')}` });
       return;
