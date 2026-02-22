@@ -14,9 +14,12 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   const router = Router();
   router.use(authMiddleware);
 
-  // List all sessions
-  router.get('/', (req, res) => {
-    const sessions = sessionManager.getSessions();
+  // List sessions owned by the authenticated user
+  router.get('/', (req: AuthRequest, res) => {
+    const username = req.user?.username;
+    const sessions = sessionManager.getSessions().filter(
+      (s) => s.createdBy === username
+    );
     res.json({ sessions });
   });
 
@@ -27,6 +30,19 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     if (!name || !repoUrl || !branch) {
       const error: ErrorResponse = { error: 'Name, repoUrl, and branch are required' };
       res.status(400).json(error);
+      return;
+    }
+
+    // Validate repo URL — only allow HTTPS GitHub URLs to prevent SSRF and argument injection
+    if (!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$/.test(repoUrl)) {
+      res.status(400).json({ error: 'repoUrl must be a valid HTTPS GitHub URL (https://github.com/owner/repo)' });
+      return;
+    }
+
+    // Validate branch name — reject anything starting with '-' (argument injection)
+    // and only allow characters valid in git branch names
+    if (/^-/.test(branch) || !/^[A-Za-z0-9_.\-/]+$/.test(branch)) {
+      res.status(400).json({ error: 'branch contains invalid characters' });
       return;
     }
 
@@ -50,10 +66,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Get session details
-  router.get('/:id', (req, res) => {
+  router.get('/:id', (req: AuthRequest, res) => {
     const id = req.params.id as string;
     const session = sessionManager.getSession(id);
     if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session.info.createdBy)) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
@@ -66,10 +86,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Get session messages
-  router.get('/:id/messages', (req, res) => {
+  router.get('/:id/messages', (req: AuthRequest, res) => {
     const id = req.params.id as string;
     const session = sessionManager.getSession(id);
     if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session.info.createdBy)) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }

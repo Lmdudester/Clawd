@@ -83,7 +83,7 @@ export class ContainerManager {
     const env: string[] = [
       `SESSION_ID=${cfg.sessionId}`,
       `SESSION_TOKEN=${cfg.sessionToken}`,
-      `MASTER_WS_URL=ws://${config.masterHostname}:${config.port}/internal/session`,
+      `MASTER_WS_URL=ws://${config.masterHostname}:${config.port}/internal/session?secret=${config.internalSecret}`,
       `PERMISSION_MODE=${cfg.permissionMode || 'normal'}`,
       `GIT_REPO_URL=${cfg.repoUrl}`,
       `GIT_BRANCH=${cfg.branch}`,

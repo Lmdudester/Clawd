@@ -74,10 +74,19 @@ const internalWss = setupInternalWebSocket(sessionManager);
 
 // Route HTTP upgrade requests to the correct WebSocket server
 server.on('upgrade', (req, socket, head) => {
-  const { pathname } = new URL(req.url ?? '/', `http://${req.headers.host}`);
+  const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+  const { pathname } = url;
   if (pathname === '/ws') {
     clientWss.handleUpgrade(req, socket, head, (ws) => clientWss.emit('connection', ws, req));
   } else if (pathname === '/internal/session') {
+    // Validate shared secret before allowing the upgrade
+    const secret = url.searchParams.get('secret');
+    if (secret !== config.internalSecret) {
+      console.warn('[internal-ws] Rejected upgrade: invalid or missing secret');
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     internalWss.handleUpgrade(req, socket, head, (ws) => internalWss.emit('connection', ws, req));
   } else {
     socket.destroy();

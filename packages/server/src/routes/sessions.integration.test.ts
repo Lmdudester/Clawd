@@ -16,7 +16,7 @@ function createTestToken() {
 function createMockSessionManager() {
   return {
     getSessions: vi.fn(() => [
-      { id: 's1', name: 'Session 1', status: 'idle' },
+      { id: 's1', name: 'Session 1', status: 'idle', createdBy: 'testuser' },
     ]),
     getSession: vi.fn((id: string) => {
       if (id === 's1') {
