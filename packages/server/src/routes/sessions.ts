@@ -27,7 +27,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   router.post('/', async (req: AuthRequest, res) => {
     const { name, repoUrl, branch, dockerAccess, managerMode } = req.body as CreateSessionRequest;
 
-    if (!name || !repoUrl || !branch) {
+    if (!name?.trim() || !repoUrl || !branch) {
       const error: ErrorResponse = { error: 'Name, repoUrl, and branch are required' };
       res.status(400).json(error);
       return;
@@ -137,7 +137,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       return;
     }
 
-    sessionManager.updateSessionSettings(id, req.body);
+    const settings = req.body;
+    const validModes = ['normal', 'auto_edits', 'dangerous', 'plan'];
+    if (settings.permissionMode !== undefined && !validModes.includes(settings.permissionMode)) {
+      res.status(400).json({ error: `Invalid permissionMode. Must be one of: ${validModes.join(', ')}` });
+      return;
+    }
+
+    sessionManager.updateSessionSettings(id, settings);
     res.json({ ok: true });
   });
 
