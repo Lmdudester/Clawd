@@ -66,10 +66,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Get session details
-  router.get('/:id', (req, res) => {
+  router.get('/:id', (req: AuthRequest, res) => {
     const id = req.params.id as string;
     const session = sessionManager.getSession(id);
     if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session.info.createdBy)) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
@@ -82,10 +86,14 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
   });
 
   // Get session messages
-  router.get('/:id/messages', (req, res) => {
+  router.get('/:id/messages', (req: AuthRequest, res) => {
     const id = req.params.id as string;
     const session = sessionManager.getSession(id);
     if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session.info.createdBy)) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
