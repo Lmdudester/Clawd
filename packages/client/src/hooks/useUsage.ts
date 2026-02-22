@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import type { UsageResponse } from '@clawd/shared';
 
 let cachedUsage: UsageResponse | null = null;
+let cachedError: string | null = null;
 let fetchPromise: Promise<UsageResponse> | null = null;
 const listeners = new Set<() => void>();
 
@@ -12,8 +13,7 @@ function notify() {
 
 export function useUsage() {
   const [, rerender] = useState(0);
-  const [loading, setLoading] = useState(!cachedUsage);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!cachedUsage && !cachedError);
 
   useEffect(() => {
     const listener = () => rerender((n) => n + 1);
@@ -24,17 +24,19 @@ export function useUsage() {
   const refresh = useCallback(() => {
     if (fetchPromise) return;
     setLoading(true);
-    setError(null);
+    cachedError = null;
     fetchPromise = api.getUsage();
     fetchPromise
-      .then((data) => { cachedUsage = data; notify(); })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err || 'Failed to load API usage data')))
-      .finally(() => { fetchPromise = null; setLoading(false); });
+      .then((data) => { cachedUsage = data; })
+      .catch((err) => { cachedError = err instanceof Error ? err.message : String(err || 'Failed to load API usage data'); })
+      .finally(() => { fetchPromise = null; setLoading(false); notify(); });
   }, []);
 
   useEffect(() => {
-    refresh();
+    if (!cachedUsage && !cachedError) {
+      refresh();
+    }
   }, [refresh]);
 
-  return { usage: cachedUsage, loading, error, refresh };
+  return { usage: cachedUsage, loading, error: cachedError, refresh };
 }

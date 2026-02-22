@@ -33,16 +33,23 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
+  // Sync local name state whenever the dialog is open and session.name changes (e.g. external rename)
   useEffect(() => {
     if (open) {
       setName(session.name);
+    }
+  }, [open, session.name]);
+
+  // Fetch available models only when the dialog opens — not on rename
+  useEffect(() => {
+    if (open) {
       setModelsTimedOut(false);
       onRequestModels();
       // If models haven't loaded after 5s, stop showing loading state
       const timer = setTimeout(() => setModelsTimedOut(true), 5000);
       return () => clearTimeout(timer);
     }
-  }, [open, session.name, onRequestModels]);
+  }, [open, onRequestModels]);
 
   if (!open) return null;
 
