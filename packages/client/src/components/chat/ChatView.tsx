@@ -229,15 +229,13 @@ export function ChatView() {
               {session.managerState.currentStep}
             </span>
           )}
+          <span className="text-slate-500">·</span>
+          <span>Manager{isManagerPaused ? ' · Paused' : ''}</span>
           {session.managerState && session.managerState.childSessionIds.length > 0 && (
-            <span className="text-slate-400">
+            <><span className="text-slate-500">·</span><span className="text-slate-400">
               {session.managerState.childSessionIds.length} child{session.managerState.childSessionIds.length !== 1 ? 'ren' : ''}
-            </span>
+            </span></>
           )}
-          <span className="text-slate-500">—</span>
-          <span>{isManagerPaused
-            ? 'Paused — auto-continue is suspended'
-            : 'Autonomous manager — messages guide the orchestration loop'}</span>
         </div>
       )}
 
