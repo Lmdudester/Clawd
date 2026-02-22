@@ -19,6 +19,7 @@ export function SessionCard({ session }: { session: SessionInfo }) {
 
   const handleClose = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!window.confirm(`Delete session "${session.name}"?`)) return;
     removeSession(session.id);
     try {
       await api.deleteSession(session.id);
