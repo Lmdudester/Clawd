@@ -101,6 +101,10 @@ const READONLY_BASH_PATTERNS = [
   /^npx\s+tsc\s+--noEmit\b/,
   /^node\s+-e\b/,
   /^node\s+--eval\b/,
+  // Build & test (npm/npx/node)
+  /^npm\s+(run\s+)?(build|test|typecheck|lint|check)\b/,
+  /^npx\s+tsc\b/,
+  /^npx\s+(vitest|jest|mocha|eslint|prettier\s+--check)\b/,
   // Python read-only
   /^python3?\s+-c\b/,
 ];

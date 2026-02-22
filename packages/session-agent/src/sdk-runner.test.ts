@@ -69,6 +69,34 @@ describe('isReadOnlyBash', () => {
   it('rejects gh api with --method DELETE', () => {
     expect(isReadOnlyBash('Bash', { command: 'gh api --method DELETE /repos/owner/repo' })).toBe(false);
   });
+
+  it('approves npm run build', () => {
+    expect(isReadOnlyBash('Bash', { command: 'npm run build' })).toBe(true);
+  });
+
+  it('approves npm test', () => {
+    expect(isReadOnlyBash('Bash', { command: 'npm test' })).toBe(true);
+  });
+
+  it('approves npm run lint', () => {
+    expect(isReadOnlyBash('Bash', { command: 'npm run lint' })).toBe(true);
+  });
+
+  it('approves npx tsc', () => {
+    expect(isReadOnlyBash('Bash', { command: 'npx tsc' })).toBe(true);
+  });
+
+  it('approves npx vitest', () => {
+    expect(isReadOnlyBash('Bash', { command: 'npx vitest run' })).toBe(true);
+  });
+
+  it('approves npx jest', () => {
+    expect(isReadOnlyBash('Bash', { command: 'npx jest' })).toBe(true);
+  });
+
+  it('approves npx eslint', () => {
+    expect(isReadOnlyBash('Bash', { command: 'npx eslint src/' })).toBe(true);
+  });
 });
 
 describe('getEditFilePath', () => {
