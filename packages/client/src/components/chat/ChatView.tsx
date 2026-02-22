@@ -277,7 +277,7 @@ export function ChatView() {
       ) : pendingQuestion && session?.status === 'awaiting_answer' ? (
         <QuestionPanel question={pendingQuestion} onAnswer={handleAnswer} onInterrupt={handleInterrupt} />
       ) : (
-        <MessageInput onSend={handleSend} disabled={isInputDisabled} isInterruptible={isInterruptible} onInterrupt={handleInterrupt} />
+        <MessageInput onSend={handleSend} disabled={isInputDisabled} isInterruptible={isInterruptible} onInterrupt={handleInterrupt} sessionId={id} />
       )}
 
       {session && (

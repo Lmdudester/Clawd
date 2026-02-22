@@ -11,6 +11,25 @@ function repoShortName(url: string): string {
   return url.split('/').filter(Boolean).pop()?.replace(/\.git$/, '') || url;
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')   // fenced code blocks
+    .replace(/`([^`]*)`/g, '$1')        // inline code
+    .replace(/\*\*(.+?)\*\*/g, '$1')    // bold **
+    .replace(/__(.+?)__/g, '$1')        // bold __
+    .replace(/\*(.+?)\*/g, '$1')        // italic *
+    .replace(/_(.+?)_/g, '$1')          // italic _
+    .replace(/~~(.+?)~~/g, '$1')        // strikethrough
+    .replace(/^#{1,6}\s+/gm, '')        // headings
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // links
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1') // images
+    .replace(/^\s*[-*+]\s+/gm, '')      // unordered list markers
+    .replace(/^\s*\d+\.\s+/gm, '')      // ordered list markers
+    .replace(/^\s*>\s+/gm, '')          // blockquotes
+    .replace(/\s+/g, ' ')              // collapse whitespace
+    .trim();
+}
+
 export function SessionCard({ session }: { session: SessionInfo }) {
   const navigate = useNavigate();
   const removeSession = useSessionStore((s) => s.removeSession);
@@ -99,7 +118,7 @@ export function SessionCard({ session }: { session: SessionInfo }) {
         </div>
       )}
       {session.lastMessagePreview && (
-        <p className="text-base text-slate-400 truncate">{session.lastMessagePreview}</p>
+        <p className="text-base text-slate-400 truncate">{stripMarkdown(session.lastMessagePreview)}</p>
       )}
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-2">

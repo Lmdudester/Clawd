@@ -9,11 +9,15 @@ interface SessionState {
   pendingApprovals: Map<string, PendingApproval>;
   pendingQuestions: Map<string, PendingQuestion>;
   availableModels: ModelInfo[];
+  deletedSessionIds: Set<string>;
+  draftMessages: Map<string, string>;
 
   setSessions: (sessions: SessionInfo[]) => void;
   updateSession: (session: SessionInfo) => void;
   addSession: (session: SessionInfo) => void;
   removeSession: (id: string) => void;
+  setDraftMessage: (sessionId: string, text: string) => void;
+  getDraftMessage: (sessionId: string) => string;
   setCurrentSession: (id: string | null) => void;
   addMessages: (sessionId: string, newMessages: SessionMessage[]) => void;
   setMessages: (sessionId: string, messages: SessionMessage[]) => void;
@@ -35,11 +39,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   pendingApprovals: new Map(),
   pendingQuestions: new Map(),
   availableModels: [],
+  deletedSessionIds: new Set(),
+  draftMessages: new Map(),
 
   setSessions: (sessions) => set({ sessions }),
 
   updateSession: (session) =>
     set((state) => {
+      if (state.deletedSessionIds.has(session.id)) return state;
       const exists = state.sessions.some((s) => s.id === session.id);
       return {
         sessions: exists
@@ -75,12 +82,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       pendingApprovals.delete(id);
       const pendingQuestions = new Map(state.pendingQuestions);
       pendingQuestions.delete(id);
+      const deletedSessionIds = new Set(state.deletedSessionIds);
+      deletedSessionIds.add(id);
+      const draftMessages = new Map(state.draftMessages);
+      draftMessages.delete(id);
       return {
         sessions: state.sessions.filter((s) => s.id !== id),
         messages,
         streamingTokens,
         pendingApprovals,
         pendingQuestions,
+        deletedSessionIds,
+        draftMessages,
       };
     }),
 
@@ -176,4 +189,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   clearAllPendingApprovals: () => set({ pendingApprovals: new Map() }),
   clearAllPendingQuestions: () => set({ pendingQuestions: new Map() }),
   setAvailableModels: (models) => set({ availableModels: models }),
+  setDraftMessage: (sessionId, text) =>
+    set((state) => {
+      const draftMessages = new Map(state.draftMessages);
+      if (text) {
+        draftMessages.set(sessionId, text);
+      } else {
+        draftMessages.delete(sessionId);
+      }
+      return { draftMessages };
+    }),
+  getDraftMessage: (sessionId) => get().draftMessages.get(sessionId) ?? '',
 }));

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, createContext, useContext } from 'react';
+import { useEffect, useRef, useCallback, useState, createContext, useContext } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNotificationStore } from '../stores/notificationStore';
@@ -6,19 +6,22 @@ import { getReconnectDelay } from '../lib/reconnect';
 import type { ClientMessage, ServerMessage } from '@clawd/shared';
 
 type SendFn = (message: ClientMessage) => void;
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 
-export const WebSocketContext = createContext<{ send: SendFn }>({
+export const WebSocketContext = createContext<{ send: SendFn; connectionStatus: ConnectionStatus }>({
   send: () => {},
+  connectionStatus: 'disconnected',
 });
 
-export function useWebSocket(): { send: SendFn } {
+export function useWebSocket(): { send: SendFn; connectionStatus: ConnectionStatus } {
   return useContext(WebSocketContext);
 }
 
-export function useWebSocketProvider(): { send: SendFn } {
+export function useWebSocketProvider(): { send: SendFn; connectionStatus: ConnectionStatus } {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempt = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const token = useAuthStore((s) => s.token);
   const logout = useAuthStore((s) => s.logout);
 
@@ -41,9 +44,11 @@ export function useWebSocketProvider(): { send: SendFn } {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     wsRef.current = ws;
+    setConnectionStatus('connecting');
 
     ws.onopen = () => {
       reconnectAttempt.current = 0;
+      setConnectionStatus('connected');
       ws.send(JSON.stringify({ type: 'auth', token }));
     };
 
@@ -112,6 +117,7 @@ export function useWebSocketProvider(): { send: SendFn } {
       clearAllPendingQuestions();
       const delay = getReconnectDelay(reconnectAttempt.current);
       reconnectAttempt.current++;
+      setConnectionStatus('reconnecting');
       reconnectTimer.current = setTimeout(connect, delay);
     };
 
@@ -135,5 +141,5 @@ export function useWebSocketProvider(): { send: SendFn } {
     }
   }, []);
 
-  return { send };
+  return { send, connectionStatus };
 }
