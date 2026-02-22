@@ -242,7 +242,8 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       return;
     }
 
-    await sessionManager.pauseManager(id);
+    const { resumeAt } = req.body ?? {};
+    await sessionManager.pauseManager(id, resumeAt);
     res.json({ ok: true });
   });
 

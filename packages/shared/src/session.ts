@@ -26,6 +26,7 @@ export interface ManagerState {
   childSessionIds: string[];
   preferences?: ManagerPreferences;
   paused?: boolean;
+  resumeAt?: string; // ISO 8601 timestamp — when the timed resume is scheduled
 }
 
 export interface SessionInfo {

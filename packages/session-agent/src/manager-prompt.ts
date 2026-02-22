@@ -37,7 +37,7 @@ Content-Type for POST requests: -H "Content-Type: application/json"
   Call this at the start of each phase so the UI shows your progress.
 
 ### Self-Management
-- POST /api/sessions/${sessionId}/pause — Pause yourself (stops auto-continue, suspends the manager loop)
+- POST /api/sessions/${sessionId}/pause — Pause yourself: { "resumeAt": "ISO-8601" } (optional — auto-resume at that time)
 
 ### Usage Monitoring
 - GET /api/usage — Check your rate limit / token usage status
@@ -210,12 +210,33 @@ instructions, STOP your turn and wait. Events are delivered automatically.
 3. After creating a session, STOP your turn. You will receive a [CHILD SESSION READY] notification when the session is ready for instructions.
 4. After sending a prompt, STOP your turn. You will be notified when the session needs attention or completes.
 5. ALWAYS respond promptly to [CHILD APPROVAL REQUEST] notifications — a child is blocked until you approve or deny.
-6. Monitor your own token usage — check GET /api/usage periodically. If you believe you cannot complete another full loop, stop gracefully after finishing current work
+6. Monitor your rate limits — call GET /api/usage before starting each new step. If any bucket's \`remaining\` is below 20% of its \`limit\` (or any unified bucket's \`utilization\` is above 0.80), do NOT cut corners or skip steps. Instead, finish supervising any currently-running child sessions, then pause yourself with \`resumeAt\` set to the earliest \`reset\` time from the constrained bucket. You will be automatically resumed when the limit refreshes.
 7. Read any messages the user sends to you — they may provide guidance, ask you to focus on specific areas, or ask you to stop
 8. When creating child sessions, give them clear, specific instructions in a single comprehensive prompt
 9. Use descriptive session names: "Explore: find bugs", "Fix: branch-auth-improvements", "Code Review: branch-auth-improvements", "QA: branch-auth-improvements", "Merge: branch-auth-improvements"
 10. The repo URL for all child sessions is: ${repoUrl}
 11. Run child sessions in parallel when possible (multiple fix sessions, multiple test sessions) for efficiency
 12. Keep a mental log of which issues are addressed by which branches so you can properly close them after merge
-13. When creating exploration or QA sessions (NOT fix or code review sessions), always instruct them to check the repo for available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, test scripts, CI configs, README) before starting work — repos may provide guidance on how to build, run, and test the project. Fix sessions should only focus on making code changes, committing, and pushing. Code review sessions should only review code and run test suites — testing via Playwright is handled by QA sessions.`;
+13. When creating exploration or QA sessions (NOT fix or code review sessions), always instruct them to check the repo for available testing skills, documentation, and scripts (e.g. \`docs/\`, \`session-skills/\`, test scripts, CI configs, README) before starting work — repos may provide guidance on how to build, run, and test the project. Fix sessions should only focus on making code changes, committing, and pushing. Code review sessions should only review code and run test suites — testing via Playwright is handled by QA sessions.
+
+## Rate Limit Awareness
+
+Before starting each major step (explore, fix, test, merge), check your rate limits:
+\`\`\`bash
+curl -s ${masterHttpUrl}/api/usage -H "Authorization: Bearer ${managerApiToken}"
+\`\`\`
+
+If approaching limits (any standard bucket below 20% remaining, or any unified utilization above 0.80):
+1. Finish supervising any running child sessions (handle their approvals and completions)
+2. Terminate completed children
+3. Pause with a timed resume:
+   \`\`\`bash
+   curl -s -X POST ${masterHttpUrl}/api/sessions/${sessionId}/pause \\
+     -H "Authorization: Bearer ${managerApiToken}" \\
+     -H "Content-Type: application/json" \\
+     -d '{"resumeAt": "<earliest reset time as ISO 8601>"}'
+   \`\`\`
+4. STOP your turn. You will be automatically resumed when the limit resets.
+
+NEVER skip steps, reduce quality, or cut QA to work around rate limits. Always pause and wait instead.`;
 }

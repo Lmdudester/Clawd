@@ -30,6 +30,7 @@ interface ManagedSession {
   cleanupPromise: Promise<void> | null;
   managerApiToken: string | null;
   managerContinueTimer: ReturnType<typeof setTimeout> | null;
+  managerResumeTimer: ReturnType<typeof setTimeout> | null;
   managerState: ManagerState | null;
   pendingManagerEvents: string[];
 }
@@ -132,6 +133,7 @@ export class SessionManager {
       cleanupPromise: null,
       managerApiToken: managerMode ? uuid() : null,
       managerContinueTimer: null,
+      managerResumeTimer: null,
       managerState,
       pendingManagerEvents: [],
     };
@@ -559,11 +561,37 @@ export class SessionManager {
     this.sendToAgent(sessionId, { type: 'interrupt' });
   }
 
-  async pauseManager(sessionId: string): Promise<void> {
+  async pauseManager(sessionId: string, resumeAt?: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session || !session.info.isManager || !session.managerState) return;
 
     session.managerState.paused = true;
+
+    // Clear any existing resume timer
+    if (session.managerResumeTimer) {
+      clearTimeout(session.managerResumeTimer);
+      session.managerResumeTimer = null;
+    }
+    session.managerState.resumeAt = undefined;
+
+    // Set up timed auto-resume if requested
+    let resumeMessage = 'Manager session paused. Auto-continue is suspended.';
+    if (resumeAt) {
+      const resumeTime = new Date(resumeAt).getTime();
+      const now = Date.now();
+      const delay = resumeTime - now;
+      const maxDelay = 24 * 60 * 60 * 1000; // 24 hours
+
+      if (delay > 0 && delay <= maxDelay) {
+        session.managerState.resumeAt = resumeAt;
+        session.managerResumeTimer = setTimeout(() => {
+          session.managerResumeTimer = null;
+          this.resumeManager(sessionId);
+        }, delay);
+        resumeMessage = `Manager session paused. Will auto-resume at ${resumeAt}.`;
+      }
+    }
+
     session.info.managerState = session.managerState;
 
     // Clear any pending auto-continue timer
@@ -586,11 +614,11 @@ export class SessionManager {
       id: uuid(),
       sessionId,
       type: 'system',
-      content: 'Manager session paused. Auto-continue is suspended.',
+      content: resumeMessage,
       timestamp: new Date().toISOString(),
     });
 
-    console.log(`[session:${sessionId}] Manager paused`);
+    console.log(`[session:${sessionId}] Manager paused${session.managerState.resumeAt ? ` (auto-resume at ${session.managerState.resumeAt})` : ''}`);
   }
 
   resumeManager(sessionId: string): void {
@@ -598,7 +626,14 @@ export class SessionManager {
     if (!session || !session.info.isManager || !session.managerState) return;
     if (!session.managerState.paused) return;
 
+    // Clear any pending auto-resume timer
+    if (session.managerResumeTimer) {
+      clearTimeout(session.managerResumeTimer);
+      session.managerResumeTimer = null;
+    }
+
     session.managerState.paused = false;
+    session.managerState.resumeAt = undefined;
     session.info.managerState = session.managerState;
 
     this.emit(sessionId, 'session_update', session.info);
@@ -693,6 +728,12 @@ export class SessionManager {
         session.managerContinueTimer = null;
       }
 
+      // Clear auto-resume timer
+      if (session.managerResumeTimer) {
+        clearTimeout(session.managerResumeTimer);
+        session.managerResumeTimer = null;
+      }
+
       // Clear child activity timer
       this.clearChildActivityTimer(sessionId);
 
@@ -736,6 +777,13 @@ export class SessionManager {
         clearTimeout(session.managerContinueTimer);
         session.managerContinueTimer = null;
       }
+
+      // Clear auto-resume timer
+      if (session.managerResumeTimer) {
+        clearTimeout(session.managerResumeTimer);
+        session.managerResumeTimer = null;
+      }
+
       // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
       this.updateStatus(session, 'terminated');
       // Explicitly close the agent WebSocket before nulling it so the close
