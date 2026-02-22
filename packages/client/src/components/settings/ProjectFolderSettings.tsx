@@ -40,6 +40,7 @@ export function ProjectFolderSettings() {
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
     if (!newLabel.trim() || !newUrl.trim()) return;
     const trimmedUrl = newUrl.trim();
     if (!isValidRepoUrl(trimmedUrl)) {
@@ -47,6 +48,7 @@ export function ProjectFolderSettings() {
       return;
     }
     setUrlError(null);
+    setSaving(true);
     const isFirst = repos.length === 0;
     const updated = [...repos, { label: newLabel.trim(), url: trimmedUrl, defaultBranch: newBranch.trim() || 'main', isDefault: isFirst }];
     saveRepos(updated);

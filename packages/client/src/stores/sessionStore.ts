@@ -41,9 +41,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   updateSession: (session) =>
     set((state) => {
       const exists = state.sessions.some((s) => s.id === session.id);
-      if (!exists) return state;
       return {
-        sessions: state.sessions.map((s) => (s.id === session.id ? session : s)),
+        sessions: exists
+          ? state.sessions.map((s) => (s.id === session.id ? session : s))
+          : [...state.sessions, session],
       };
     }),
 

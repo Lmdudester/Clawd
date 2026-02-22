@@ -52,6 +52,10 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
     const trimmed = name.trim();
     if (trimmed && trimmed !== session.name) {
       onUpdateSettings({ name: trimmed });
+      onUpdateSessionOptimistic({ ...session, name: trimmed });
+    } else {
+      // Revert to original name if empty or unchanged
+      setName(session.name);
     }
   }
 
@@ -69,10 +73,7 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
             <input
               type="text"
               value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                onUpdateSessionOptimistic({ ...session, name: e.target.value });
-              }}
+              onChange={(e) => setName(e.target.value)}
               onBlur={handleNameCommit}
               onKeyDown={(e) => { if (e.key === 'Enter') handleNameCommit(); }}
               className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"

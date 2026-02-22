@@ -11,10 +11,17 @@ function getTextContent(node: ReactNode): string {
 export function CodeBlock({ children, language, className }: { children: ReactNode; language?: string; className?: string }) {
   const [copied, setCopied] = useState(false);
 
+  const [copyFailed, setCopyFailed] = useState(false);
+
   const copy = async () => {
-    await navigator.clipboard.writeText(getTextContent(children));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(getTextContent(children));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 2000);
+    }
   };
 
   return (
@@ -25,7 +32,7 @@ export function CodeBlock({ children, language, className }: { children: ReactNo
           onClick={copy}
           className="hover:text-white transition-colors"
         >
-          {copied ? 'Copied!' : 'Copy'}
+          {copied ? 'Copied!' : copyFailed ? 'Failed' : 'Copy'}
         </button>
       </div>
       <pre className="p-3 overflow-x-auto text-sm">
