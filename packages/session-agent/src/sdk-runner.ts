@@ -21,6 +21,10 @@ const READONLY_TOOLS = new Set([
 ]);
 const READONLY_MCP_PREFIXES = ['mcp__playwright__'];
 
+// Maximum number of messages to buffer before the SDK consumes them.
+// Prevents unbounded memory growth if the SDK is blocked for an extended period.
+const MAX_PENDING_MESSAGES = 100;
+
 // Bash commands that are safe to auto-approve without user interaction
 const READONLY_BASH_PATTERNS = [
   // gh CLI read-only subcommands
@@ -196,6 +200,10 @@ export class SDKRunner {
       const waiter = this.messageQueue.shift()!;
       waiter.resolve(message);
     } else {
+      if (this.pendingMessages.length >= MAX_PENDING_MESSAGES) {
+        const dropped = this.pendingMessages.shift();
+        console.warn(`[agent] Message queue full (${MAX_PENDING_MESSAGES}), dropping oldest message of type: ${dropped?.type ?? 'unknown'}`);
+      }
       this.pendingMessages.push(message);
     }
   }
@@ -546,16 +554,17 @@ export class SDKRunner {
     this.masterClient.send({ type: 'status_update', status: 'awaiting_approval' });
     this.masterClient.send({ type: 'approval_request', approval });
 
+    let timeoutId: ReturnType<typeof setTimeout>;
     const promises: Promise<{ behavior: 'allow' | 'deny'; message?: string }>[] = [
       new Promise<{ behavior: 'allow' | 'deny'; message?: string }>((resolve) => {
         this.pendingApproval = { approval, resolve };
       }),
-      new Promise<{ behavior: 'deny'; message: string }>((resolve) =>
-        setTimeout(() => {
+      new Promise<{ behavior: 'deny'; message: string }>((resolve) => {
+        timeoutId = setTimeout(() => {
           console.warn(`[agent] tool approval timed out for ${toolName}`);
           resolve({ behavior: 'deny', message: 'Approval timed out (5 min)' });
-        }, 5 * 60 * 1000)
-      ),
+        }, 5 * 60 * 1000);
+      }),
     ];
     if (signal) {
       promises.push(new Promise((resolve) => {
@@ -564,6 +573,7 @@ export class SDKRunner {
       }));
     }
     const result = await Promise.race(promises);
+    clearTimeout(timeoutId!);
 
     this.pendingApproval = null;
     this.masterClient.send({ type: 'status_update', status: 'running' });
