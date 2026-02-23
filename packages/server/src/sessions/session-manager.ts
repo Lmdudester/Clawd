@@ -33,9 +33,13 @@ interface ManagedSession {
   managerApiToken: string | null;
   managerContinueTimer: ReturnType<typeof setTimeout> | null;
   managerState: ManagerState | null;
+  cancelContainerWatch: (() => void) | null;
 }
 
 type SessionEventHandler = (sessionId: string, event: string, data: unknown) => void;
+
+// Max time to wait for a session container to connect and report ready.
+const STARTUP_TIMEOUT_MS = 120_000; // 2 minutes
 
 // Keep the most recent N messages per session to prevent unbounded memory growth.
 const MAX_MESSAGES_PER_SESSION = 500;
@@ -134,6 +138,7 @@ export class SessionManager {
       managerApiToken: managerMode ? uuid() : null,
       managerContinueTimer: null,
       managerState,
+      cancelContainerWatch: null,
     };
 
     this.sessions.set(id, session);
@@ -163,6 +168,24 @@ export class SessionManager {
       });
       this.scheduleEviction(id);
     });
+
+    // Startup timeout — if the session is still in 'starting' after the timeout,
+    // mark it as error so the UI doesn't show "Starting" indefinitely.
+    setTimeout(() => {
+      const s = this.sessions.get(id);
+      if (s && s.info.status === 'starting') {
+        console.error(`[session:${id}] Startup timeout — container did not become ready within ${STARTUP_TIMEOUT_MS}ms`);
+        this.updateStatus(s, 'error');
+        this.addMessage(s, {
+          id: uuid(),
+          sessionId: id,
+          type: 'error',
+          content: 'Session startup timed out. The container may have failed to start or the agent could not connect.',
+          timestamp: new Date().toISOString(),
+        });
+        this.scheduleEviction(id);
+      }
+    }, STARTUP_TIMEOUT_MS);
 
     return info;
   }
@@ -256,6 +279,23 @@ export class SessionManager {
 
     const containerId = await this.containerManager.createSessionContainer(containerConfig);
     session.containerId = containerId;
+
+    // Watch for unexpected container exit (e.g., entrypoint crash, OOM kill)
+    session.cancelContainerWatch = this.containerManager.watchForExit(session.info.id, (exitCode) => {
+      const s = this.sessions.get(session.info.id);
+      if (s && (s.info.status === 'starting' || s.info.status === 'idle' || s.info.status === 'running')) {
+        console.error(`[session:${session.info.id}] Container exited unexpectedly with code ${exitCode}`);
+        this.updateStatus(s, 'error');
+        this.addMessage(s, {
+          id: uuid(),
+          sessionId: session.info.id,
+          type: 'error',
+          content: `Session container exited unexpectedly (exit code: ${exitCode})`,
+          timestamp: new Date().toISOString(),
+        });
+        this.scheduleEviction(session.info.id);
+      }
+    });
   }
 
   // --- Agent authentication & connection management ---
@@ -664,6 +704,12 @@ export class SessionManager {
         session.managerContinueTimer = null;
       }
 
+      // Cancel container exit watcher before stopping — this is an intentional termination
+      if (session.cancelContainerWatch) {
+        session.cancelContainerWatch();
+        session.cancelContainerWatch = null;
+      }
+
       // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
       this.updateStatus(session, 'terminated');
       // Explicitly close the agent WebSocket before nulling it so the close
@@ -701,6 +747,13 @@ export class SessionManager {
         clearTimeout(session.managerContinueTimer);
         session.managerContinueTimer = null;
       }
+
+      // Cancel container exit watcher before stopping — this is an intentional deletion
+      if (session.cancelContainerWatch) {
+        session.cancelContainerWatch();
+        session.cancelContainerWatch = null;
+      }
+
       // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
       this.updateStatus(session, 'terminated');
       // Explicitly close the agent WebSocket before nulling it so the close
@@ -934,6 +987,7 @@ export class SessionManager {
         managerApiToken: persisted.managerApiToken,
         managerContinueTimer: null,
         managerState: persisted.managerState,
+        cancelContainerWatch: null,
       };
 
       this.sessions.set(persisted.info.id, session);

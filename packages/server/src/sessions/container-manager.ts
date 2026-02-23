@@ -240,6 +240,28 @@ export class ContainerManager {
     }
   }
 
+  /**
+   * Watch a container for exit. Calls the callback with the exit code
+   * if the container stops. Returns a cleanup function to stop watching.
+   */
+  watchForExit(sessionId: string, onExit: (exitCode: number) => void): () => void {
+    const containerId = this.containers.get(sessionId);
+    if (!containerId) return () => {};
+
+    const container = this.docker.getContainer(containerId);
+    let cancelled = false;
+
+    container.wait().then((result) => {
+      if (!cancelled) {
+        onExit(result.StatusCode);
+      }
+    }).catch(() => {
+      // Container may have been removed already
+    });
+
+    return () => { cancelled = true; };
+  }
+
   async stopAndRemove(sessionId: string): Promise<void> {
     // Clean up any test Clawd instances spawned by this session
     await this.cleanupTestInstances(sessionId);

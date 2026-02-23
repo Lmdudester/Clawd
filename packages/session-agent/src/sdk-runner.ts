@@ -462,6 +462,14 @@ export class SDKRunner {
           timestamp: new Date().toISOString(),
         },
       });
+    } finally {
+      // Ensure any pending queryTurnDone promise is resolved so
+      // sendUserMessage() doesn't hang forever if the SDK exits mid-turn.
+      this.queryTurnInProgress = false;
+      if (this.resolveQueryTurn) {
+        this.resolveQueryTurn();
+        this.resolveQueryTurn = null;
+      }
     }
   }
 
