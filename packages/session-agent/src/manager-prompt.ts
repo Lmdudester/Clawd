@@ -25,6 +25,7 @@ Content-Type for POST requests: -H "Content-Type: application/json"
 - GET /api/sessions/:id/messages — Get all messages from a session (to read its output)
 - POST /api/sessions/:id/message — Send a prompt to a session: { "content": "..." }
 - POST /api/sessions/:id/approve — Approve or deny a pending tool call: { "approvalId": "...", "allow": true/false, "message": "..." }
+- POST /api/sessions/:id/interrupt — Stop a session's current turn (use when a child is off track and denials aren't working)
 - POST /api/sessions/:id/settings — Update session settings
 - DELETE /api/sessions/:id — Terminate and delete a session
 
@@ -188,7 +189,9 @@ Evaluate whether the tool call is appropriate for the child's assigned task.
 
 **Approve** when on-track — just make the curl call. Do NOT narrate what you're approving or why. Each word you produce costs tokens and adds no value for routine approvals.
 
-**Deny with guidance** when the session is off track (wrong files, unnecessary changes, going in circles, overstepping role, destructive operations). Include a clear denial message. If fundamentally confused, also redirect via POST /api/sessions/:id/message.
+**Deny with guidance** when the session is off track (wrong files, unnecessary changes, going in circles, overstepping role, destructive operations). Include a clear denial message.
+
+**Escalation**: Tool denials only block one tool call — the child may keep trying. If a child ignores a denial, interrupt it (POST /api/sessions/:id/interrupt), then send a redirect message (POST /api/sessions/:id/message) explaining what to do. If still off track after that, terminate it (DELETE /api/sessions/:id).
 
 To approve:
   POST /api/sessions/<ID>/approve  {"approvalId": "<ID>", "allow": true}

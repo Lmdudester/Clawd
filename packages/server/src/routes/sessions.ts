@@ -224,6 +224,23 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     res.json({ ok: true });
   });
 
+  // Interrupt a running session (stop its current turn)
+  router.post('/:id/interrupt', async (req: AuthRequest, res) => {
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session, sessionManager)) {
+      res.status(403).json({ error: 'Not authorized for this session' });
+      return;
+    }
+
+    await sessionManager.interruptSession(id);
+    res.json({ ok: true });
+  });
+
   // Pause a manager session (allows the manager to pause itself via API)
   router.post('/:id/pause', async (req: AuthRequest, res) => {
     const id = req.params.id as string;
