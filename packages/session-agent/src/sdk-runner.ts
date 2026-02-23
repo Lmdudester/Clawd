@@ -180,7 +180,7 @@ export class SDKRunner {
   }
 
   // AsyncIterable message channel for feeding prompts to the SDK
-  private messageQueue: Array<{ resolve: (msg: any) => void }> = [];
+  private messageQueue: Array<{ resolve: (result: IteratorResult<any>) => void }> = [];
   private pendingMessages: any[] = [];
   private channelClosed = false;
 
@@ -194,9 +194,7 @@ export class SDKRunner {
           return Promise.resolve({ value: undefined as any, done: true });
         }
         return new Promise((resolve) => {
-          this.messageQueue.push({
-            resolve: (msg: any) => resolve({ value: msg, done: false }),
-          });
+          this.messageQueue.push({ resolve });
         });
       },
     }),
@@ -206,7 +204,7 @@ export class SDKRunner {
     if (this.channelClosed) return;
     if (this.messageQueue.length > 0) {
       const waiter = this.messageQueue.shift()!;
-      waiter.resolve(message);
+      waiter.resolve({ value: message, done: false });
     } else {
       if (this.pendingMessages.length >= MAX_PENDING_MESSAGES) {
         const dropped = this.pendingMessages.shift();
@@ -219,7 +217,7 @@ export class SDKRunner {
   private closeChannel(): void {
     this.channelClosed = true;
     for (const waiter of this.messageQueue) {
-      waiter.resolve(undefined);
+      waiter.resolve({ value: undefined, done: true });
     }
     this.messageQueue = [];
   }
