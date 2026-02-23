@@ -32,26 +32,20 @@ describe('buildContainerEnv', () => {
   it('includes required environment variables', () => {
     const env = buildContainerEnv(baseCfg());
     expect(env).toContain('SESSION_ID=session-123');
-    expect(env).toContain('SESSION_TOKEN=token-abc');
     expect(env).toContain('GIT_REPO_URL=https://github.com/test/repo');
     expect(env).toContain('GIT_BRANCH=main');
     expect(env).toContain('PERMISSION_MODE=normal');
-    expect(env.some(e => e.startsWith('MASTER_WS_URL='))).toBe(true);
   });
 
-  it('includes GITHUB_TOKEN when present', () => {
-    const env = buildContainerEnv(baseCfg({ githubToken: 'ghp_abc123' }));
-    expect(env).toContain('GITHUB_TOKEN=ghp_abc123');
-  });
-
-  it('excludes GITHUB_TOKEN when not present', () => {
-    const env = buildContainerEnv(baseCfg());
+  it('does not include secrets as environment variables', () => {
+    const env = buildContainerEnv(baseCfg({
+      githubToken: 'ghp_abc123',
+      oauthToken: 'oauth-xyz',
+    }));
+    expect(env.some(e => e.startsWith('SESSION_TOKEN='))).toBe(false);
+    expect(env.some(e => e.startsWith('MASTER_WS_URL='))).toBe(false);
     expect(env.some(e => e.startsWith('GITHUB_TOKEN='))).toBe(false);
-  });
-
-  it('includes CLAUDE_CODE_OAUTH_TOKEN when present', () => {
-    const env = buildContainerEnv(baseCfg({ oauthToken: 'oauth-xyz' }));
-    expect(env).toContain('CLAUDE_CODE_OAUTH_TOKEN=oauth-xyz');
+    expect(env.some(e => e.startsWith('CLAUDE_CODE_OAUTH_TOKEN='))).toBe(false);
   });
 
   it('includes DOCKER_HOST when dockerAccess is true', () => {
@@ -85,6 +79,11 @@ describe('buildContainerBinds', () => {
     expect(binds).toContain(
       '/home/user/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro'
     );
+  });
+
+  it('includes secrets dir mount when secretsDir is provided', () => {
+    const binds = buildContainerBinds(baseCfg(), '/tmp/clawd-secrets-session-123-AbCdEf');
+    expect(binds).toContain('/tmp/clawd-secrets-session-123-AbCdEf:/run/secrets:ro');
   });
 
   it('includes docker socket when dockerAccess is true', () => {

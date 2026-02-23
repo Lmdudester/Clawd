@@ -91,7 +91,7 @@ export class ContainerManager {
       for (const entry of entries) {
         if (!entry.startsWith('clawd-secrets-')) continue;
         // Extract session ID from dir name: clawd-secrets-{sessionId}-{random}
-        const match = entry.match(/^clawd-secrets-(.+?)-[^-]+$/);
+        const match = entry.match(/^clawd-secrets-(.+)-[A-Za-z0-9]{6}$/);
         const sessionId = match?.[1];
         if (sessionId && preserveSessionIds?.has(sessionId)) continue;
         try {
