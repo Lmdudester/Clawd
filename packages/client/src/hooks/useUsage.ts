@@ -15,12 +15,6 @@ export function useUsage() {
   const [, rerender] = useState(0);
   const [loading, setLoading] = useState(!cachedUsage && !cachedError);
 
-  useEffect(() => {
-    const listener = () => rerender((n) => n + 1);
-    listeners.add(listener);
-    return () => { listeners.delete(listener); };
-  }, []);
-
   const refresh = useCallback(() => {
     if (fetchPromise) return;
     setLoading(true);
@@ -33,9 +27,13 @@ export function useUsage() {
   }, []);
 
   useEffect(() => {
+    const listener = () => rerender((n) => n + 1);
+    listeners.add(listener);
     if (!cachedUsage && !cachedError) {
       refresh();
     }
+    const interval = setInterval(refresh, 60_000);
+    return () => { listeners.delete(listener); clearInterval(interval); };
   }, [refresh]);
 
   return { usage: cachedUsage, loading, error: cachedError, refresh };
