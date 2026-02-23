@@ -19,6 +19,7 @@ import { Notifier } from './notifications/notifier.js';
 import { setupWebSocket } from './ws/handler.js';
 import { setupInternalWebSocket } from './ws/internal-handler.js';
 import { config } from './config.js';
+import { SessionStore } from './sessions/session-store.js';
 import { setManagerTokenValidator } from './auth/middleware.js';
 import { networkInterfaces } from 'os';
 
@@ -57,6 +58,29 @@ if (notifier.enabled) {
   console.log('Notifications: disabled (set NTFY_TOPIC to enable)');
 }
 
+// Load persisted session state (including stable internalSecret)
+const sessionStore = new SessionStore();
+const persistedState = sessionStore.load();
+if (persistedState) {
+  // Restore the internal secret so surviving containers can reconnect
+  config.internalSecret = persistedState.internalSecret;
+  console.log('[startup] Restored internal secret from session store');
+} else {
+  // First run — persist the newly generated secret
+  sessionStore.save({ sessions: [], internalSecret: config.internalSecret });
+  console.log('[startup] Persisted new internal secret to session store');
+}
+
+// Collect restored session IDs to prevent pruning their containers
+const restoredSessionIds = new Set<string>();
+if (persistedState) {
+  for (const s of persistedState.sessions) {
+    if (s.info.status !== 'terminated' && s.info.status !== 'error') {
+      restoredSessionIds.add(s.info.id);
+    }
+  }
+}
+
 // Initialize container manager
 const containerManager = new ContainerManager();
 
@@ -93,9 +117,11 @@ server.on('upgrade', (req, socket, head) => {
   }
 });
 
-// Graceful shutdown — clean up containers and network
+// Graceful shutdown — persist state then clean up containers and network
 const shutdown = async () => {
   console.log('\nShutting down...');
+  sessionManager.persistAll();
+  console.log('[shutdown] Session state persisted');
   await containerManager.shutdown();
   server.close();
   process.exit(0);
@@ -104,8 +130,26 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 // Initialize container manager before accepting requests
-containerManager.initialize().then(() => {
+containerManager.initialize(restoredSessionIds.size > 0 ? restoredSessionIds : undefined).then(async () => {
   console.log('[containers] Container manager initialized');
+
+  // Restore sessions from persisted state
+  if (restoredSessionIds.size > 0) {
+    const restored = sessionManager.restoreSessions();
+
+    // Match restored sessions to still-running containers
+    const runningContainers = await containerManager.findRunningContainers();
+    for (const sessionId of restored) {
+      const containerId = runningContainers.get(sessionId);
+      if (containerId) {
+        containerManager.reattachContainer(sessionId, containerId);
+      } else {
+        // Container is gone — mark session as error
+        console.warn(`[startup] Container for session ${sessionId} is no longer running`);
+        sessionManager.markOrphaned(sessionId);
+      }
+    }
+  }
 
   server.listen(config.port, config.host, () => {
     console.log(`\n  Clawd server running on http://${config.host}:${config.port}`);

@@ -18,6 +18,8 @@ import type {
 import { config } from '../config.js';
 import type { CredentialStore } from '../settings/credential-store.js';
 import type { ContainerManager, SessionContainerConfig } from './container-manager.js';
+import { SessionStore } from './session-store.js';
+import type { PersistedSession } from './session-store.js';
 
 interface ManagedSession {
   info: SessionInfo;
@@ -47,10 +49,14 @@ export class SessionManager {
   private eventHandler: SessionEventHandler | null = null;
   private credentialStore: CredentialStore;
   private containerManager: ContainerManager;
+  private store: SessionStore;
+  private persistTimer: ReturnType<typeof setTimeout> | null = null;
+  private persistDirty = false;
 
   constructor(credentialStore: CredentialStore, containerManager: ContainerManager) {
     this.credentialStore = credentialStore;
     this.containerManager = containerManager;
+    this.store = new SessionStore();
 
     // Push refreshed tokens to all active session agents
     this.credentialStore.onTokenRefreshed((newToken: string) => {
@@ -133,6 +139,7 @@ export class SessionManager {
     this.sessions.set(id, session);
     console.log(`[session:${id}] created "${name}", repo: ${repoUrl}@${branch}`);
     this.emit(id, 'session_update', info);
+    this.schedulePersist();
 
     // Add a system message about setup
     this.addMessage(session, {
@@ -269,6 +276,19 @@ export class SessionManager {
     session.agentWs = ws;
     console.log(`[session:${sessionId}] Agent WebSocket registered`);
 
+    // Handle reconnection after server restart
+    if (session.info.status === 'reconnecting') {
+      console.log(`[session:${sessionId}] Agent reconnected after server restart`);
+      this.updateStatus(session, 'idle');
+      this.addMessage(session, {
+        id: uuid(),
+        sessionId,
+        type: 'system',
+        content: 'Session restored after server restart',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     // Push current OAuth token to newly connected agent — covers the case
     // where the token was unavailable or stale at container creation time
     // but has since been refreshed.
@@ -398,6 +418,7 @@ export class SessionManager {
         if (message.totalCostUsd !== undefined) session.info.totalCostUsd = message.totalCostUsd;
         if (message.contextUsage !== undefined) session.info.contextUsage = message.contextUsage;
         this.emit(sessionId, 'session_update', session.info);
+        this.schedulePersist();
         break;
 
       case 'models_list':
@@ -615,6 +636,7 @@ export class SessionManager {
     }
 
     this.emit(sessionId, 'session_update', session.info);
+    this.schedulePersist();
 
     // Forward settings to agent
     this.sendToAgent(sessionId, {
@@ -687,6 +709,7 @@ export class SessionManager {
       session.agentWs = null;
       await this.containerManager.stopAndRemove(sessionId);
       this.sessions.delete(sessionId);
+      this.schedulePersist();
     };
 
     session.cleanupPromise = cleanup();
@@ -700,6 +723,7 @@ export class SessionManager {
       if (this.sessions.has(sessionId)) {
         console.log(`[session:${sessionId}] Evicting terminated session from memory`);
         this.sessions.delete(sessionId);
+        this.schedulePersist();
       }
     }, TERMINATED_SESSION_TTL_MS);
     this.evictionTimers.set(sessionId, timer);
@@ -841,9 +865,109 @@ export class SessionManager {
     return `Begin your independent manager loop. Start with Step 1: create exploration sessions to find ${focusDescription} in this repository. Track all findings as GitHub issues.`;
   }
 
+  // --- Persistence ---
+
+  /** Schedule a debounced persist (coalesces rapid updates into a single write). */
+  private schedulePersist(): void {
+    this.persistDirty = true;
+    if (this.persistTimer) return;
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = null;
+      if (this.persistDirty) {
+        this.persistDirty = false;
+        this.persistAllImmediate();
+      }
+    }, 1000);
+  }
+
+  /** Persist all sessions immediately (used for shutdown and debounce flush). */
+  private persistAllImmediate(): void {
+    const persisted: PersistedSession[] = [];
+    for (const session of this.sessions.values()) {
+      persisted.push({
+        info: session.info,
+        messages: session.messages,
+        sessionToken: session.sessionToken,
+        containerId: session.containerId,
+        managerApiToken: session.managerApiToken,
+        managerState: session.managerState,
+      });
+    }
+    this.store.save({ sessions: persisted, internalSecret: config.internalSecret });
+  }
+
+  /** Persist all sessions — public method called on SIGTERM/SIGINT. */
+  persistAll(): void {
+    // Cancel pending debounce timer and write immediately
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
+    this.persistDirty = false;
+    this.persistAllImmediate();
+  }
+
+  /**
+   * Restore sessions from disk on startup.
+   * Returns the list of restored session IDs (for container re-attachment).
+   */
+  restoreSessions(): string[] {
+    const state = this.store.load();
+    if (!state) return [];
+
+    const restoredIds: string[] = [];
+
+    for (const persisted of state.sessions) {
+      // Don't resurrect dead sessions
+      if (persisted.info.status === 'terminated' || persisted.info.status === 'error') {
+        continue;
+      }
+
+      const session: ManagedSession = {
+        info: { ...persisted.info, status: 'reconnecting' },
+        messages: persisted.messages,
+        containerId: persisted.containerId,
+        agentWs: null,
+        sessionToken: persisted.sessionToken,
+        pendingApproval: null,
+        pendingQuestion: null,
+        cleanupPromise: null,
+        managerApiToken: persisted.managerApiToken,
+        managerContinueTimer: null,
+        managerState: persisted.managerState,
+      };
+
+      this.sessions.set(persisted.info.id, session);
+      restoredIds.push(persisted.info.id);
+      console.log(`[session:${persisted.info.id}] Restored "${persisted.info.name}" (status: reconnecting)`);
+    }
+
+    if (restoredIds.length > 0) {
+      console.log(`[sessions] Restored ${restoredIds.length} session(s) from disk`);
+    }
+
+    return restoredIds;
+  }
+
+  /** Mark a restored session's container as gone — set to error and schedule eviction. */
+  markOrphaned(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    this.updateStatus(session, 'error');
+    this.addMessage(session, {
+      id: uuid(),
+      sessionId,
+      type: 'error',
+      content: 'Session container is no longer running (lost during server restart)',
+      timestamp: new Date().toISOString(),
+    });
+    this.scheduleEviction(sessionId);
+  }
+
   private updateStatus(session: ManagedSession, status: SessionStatus): void {
     session.info.status = status;
     this.emit(session.info.id, 'session_update', session.info);
+    this.schedulePersist();
   }
 
   private addMessage(session: ManagedSession, message: SessionMessage): void {
@@ -860,5 +984,6 @@ export class SessionManager {
         ? message.content.slice(0, 100) + '...'
         : message.content;
     this.emit(session.info.id, 'messages', [message]);
+    this.schedulePersist();
   }
 }
