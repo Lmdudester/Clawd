@@ -19,7 +19,7 @@ import { config } from '../config.js';
 import type { CredentialStore } from '../settings/credential-store.js';
 import type { ContainerManager, SessionContainerConfig } from './container-manager.js';
 import { SessionStore } from './session-store.js';
-import type { PersistedSession } from './session-store.js';
+import type { PersistedSession, PersistedState } from './session-store.js';
 
 interface ManagedSession {
   info: SessionInfo;
@@ -53,10 +53,10 @@ export class SessionManager {
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private persistDirty = false;
 
-  constructor(credentialStore: CredentialStore, containerManager: ContainerManager) {
+  constructor(credentialStore: CredentialStore, containerManager: ContainerManager, store?: SessionStore) {
     this.credentialStore = credentialStore;
     this.containerManager = containerManager;
-    this.store = new SessionStore();
+    this.store = store ?? new SessionStore();
 
     // Push refreshed tokens to all active session agents
     this.credentialStore.onTokenRefreshed((newToken: string) => {
@@ -466,7 +466,7 @@ export class SessionManager {
     if (!session) return;
 
     const { status } = session.info;
-    if (status === 'terminated' || status === 'error') {
+    if (status === 'terminated' || status === 'error' || status === 'reconnecting') {
       console.warn(`[session:${sessionId}] Cannot send message: session is ${status}`);
       return;
     }
@@ -488,7 +488,7 @@ export class SessionManager {
     if (!session) return;
 
     const { status } = session.info;
-    if (status === 'terminated' || status === 'error') {
+    if (status === 'terminated' || status === 'error' || status === 'reconnecting') {
       console.warn(`[session:${sessionId}] Cannot approve tool: session is ${status}`);
       return;
     }
@@ -502,7 +502,7 @@ export class SessionManager {
     if (!session) return;
 
     const { status } = session.info;
-    if (status === 'terminated' || status === 'error') {
+    if (status === 'terminated' || status === 'error' || status === 'reconnecting') {
       console.warn(`[session:${sessionId}] Cannot answer question: session is ${status}`);
       return;
     }
@@ -523,7 +523,7 @@ export class SessionManager {
     if (!session) return;
 
     const { status } = session.info;
-    if (status === 'idle' || status === 'terminated' || status === 'error') return;
+    if (status === 'idle' || status === 'terminated' || status === 'error' || status === 'reconnecting') return;
 
     console.log(`[session:${sessionId}] interrupting (was ${status})`);
     session.pendingApproval = null;
@@ -911,8 +911,7 @@ export class SessionManager {
    * Restore sessions from disk on startup.
    * Returns the list of restored session IDs (for container re-attachment).
    */
-  restoreSessions(): string[] {
-    const state = this.store.load();
+  restoreSessions(state: PersistedState): string[] {
     if (!state) return [];
 
     const restoredIds: string[] = [];

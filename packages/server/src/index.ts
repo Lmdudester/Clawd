@@ -84,7 +84,7 @@ if (persistedState) {
 // Initialize container manager
 const containerManager = new ContainerManager();
 
-const sessionManager = new SessionManager(credentialStore, containerManager);
+const sessionManager = new SessionManager(credentialStore, containerManager, sessionStore);
 
 // Allow manager sessions to authenticate via their API tokens
 setManagerTokenValidator((token) => sessionManager.validateManagerToken(token));
@@ -135,7 +135,7 @@ containerManager.initialize(restoredSessionIds.size > 0 ? restoredSessionIds : u
 
   // Restore sessions from persisted state
   if (restoredSessionIds.size > 0) {
-    const restored = sessionManager.restoreSessions();
+    const restored = sessionManager.restoreSessions(persistedState);
 
     // Match restored sessions to still-running containers
     const runningContainers = await containerManager.findRunningContainers();
