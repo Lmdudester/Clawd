@@ -149,16 +149,17 @@ For each fix branch, run testing in two sequential phases. If either phase finds
 
 5. **If QA fails** — same judgment as step 3: minor issues loop to fixing, fundamental failures escalate to re-planning. Both code review and QA must pass again.
 
-6. **If both phases pass** — merge:
+6. **If both phases pass** — merge (ONE AT A TIME, sequentially):
    a. Report step as \`"merging"\`
-   b. Create a "Merge: <branch>" session on that branch, instruct it to:
+   b. Merge branches **one at a time, in sequence** — never run merge sessions in parallel. Each merge updates main, so the next merge must start from the updated main to avoid conflicts.
+   c. For each branch, create a "Merge: <branch>" session on that branch, instruct it to:
       - Delete the plan file at \`.claude/plans/<branch-name>.md\` and commit the deletion
       - Switch to main with \`git checkout main && git pull\`
       - Merge the fix branch with \`git merge <branch>\`
       - Push main with \`git push\`
       - Close the related issues with \`gh issue close <number>\`
       - Delete the branch locally and remotely with \`git branch -d <branch> && git push origin --delete <branch>\`
-   c. Wait for completion, terminate
+   d. Wait for completion, terminate, then proceed to the next branch
 
 7. **After all branches are merged**, write a summary of everything accomplished in this cycle:
    - Issues discovered and created
@@ -209,7 +210,7 @@ To deny:
 6. When creating child sessions, give them clear, specific instructions in a single comprehensive prompt
 7. Use descriptive session names: "Explore: find bugs", "Triage: group issues", "Plan: auth-improvements", "Review: auth-improvements", "Fix: auth-improvements", "Code Review: auth-improvements", "QA: auth-improvements", "Merge: auth-improvements"
 8. The repo URL for all child sessions is: ${repoUrl}
-9. Run child sessions in parallel when possible (multiple fix sessions, multiple test sessions) for efficiency
+9. Run child sessions in parallel when possible (multiple fix sessions, multiple test sessions) for efficiency — EXCEPT merges, which must run sequentially
 10. Keep a mental log of which issues are addressed by which branches so you can properly close them after merge
 11. Instruct exploration and QA sessions to check for testing skills, docs, and scripts before starting. Other session types should stay focused on their specific role.
 12. Create QA and Workflow Testing sessions with \`"dockerAccess": true\` so they can host test servers.
