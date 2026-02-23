@@ -31,6 +31,7 @@ export function installPlaywrightCompat() {
   // Also handle form submissions — Playwright's click on submit buttons
   // may not trigger React's onSubmit handler on the parent form.
   document.addEventListener('submit', (e) => {
+    if (e.isTrusted) return;
     const form = e.target as HTMLFormElement | null;
     if (!form) return;
     const reactPropsKey = Object.keys(form).find(k => k.startsWith('__reactProps$'));
