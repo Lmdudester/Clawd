@@ -42,14 +42,15 @@ export function SettingsDialog({ open, onClose, session, onUpdateSettings, onUpd
 
   // Fetch available models only when the dialog opens — not on rename
   useEffect(() => {
-    if (open) {
-      setModelsTimedOut(false);
-      onRequestModels();
-      // If models haven't loaded after 5s, stop showing loading state
-      const timer = setTimeout(() => setModelsTimedOut(true), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [open, onRequestModels]);
+    if (!open) return;
+    // Models don't change during a session — skip if already loaded
+    if (availableModels.length > 0) return;
+    setModelsTimedOut(false);
+    onRequestModels();
+    // If models haven't loaded after 5s, stop showing loading state
+    const timer = setTimeout(() => setModelsTimedOut(true), 5000);
+    return () => clearTimeout(timer);
+  }, [open, availableModels.length, onRequestModels]);
 
   const dialogRef = useRef<HTMLDivElement>(null);
 

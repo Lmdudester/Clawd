@@ -66,7 +66,10 @@ export const ToolCallCard = memo(function ToolCallCard({ message, result }: Prop
       </div>
     </div>
   );
-});
+}, (prev, next) =>
+  prev.message.id === next.message.id &&
+  prev.result?.id === next.result?.id
+);
 
 // --- Tool-specific detail rendering ---
 

@@ -6,6 +6,7 @@ interface SessionState {
   currentSessionId: string | null;
   messages: Map<string, SessionMessage[]>;
   streamingTokens: Map<string, string>;
+  streamingTextBySession: Map<string, string>;
   pendingApprovals: Map<string, PendingApproval>;
   pendingQuestions: Map<string, PendingQuestion>;
   availableModels: ModelInfo[];
@@ -31,11 +32,22 @@ interface SessionState {
   setAvailableModels: (models: ModelInfo[]) => void;
 }
 
+/** Recompute the concatenated streaming text for a session from the streamingTokens Map. */
+function recomputeSessionText(streamingTokens: Map<string, string>, sessionId: string): string {
+  const prefix = `${sessionId}:`;
+  let text = '';
+  for (const [key, value] of streamingTokens) {
+    if (key.startsWith(prefix)) text += value;
+  }
+  return text;
+}
+
 export const useSessionStore = create<SessionState>((set, get) => ({
   sessions: [],
   currentSessionId: null,
   messages: new Map(),
   streamingTokens: new Map(),
+  streamingTextBySession: new Map(),
   pendingApprovals: new Map(),
   pendingQuestions: new Map(),
   availableModels: [],
@@ -78,6 +90,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           streamingTokens.delete(key);
         }
       }
+      const streamingTextBySession = new Map(state.streamingTextBySession);
+      streamingTextBySession.delete(id);
       const pendingApprovals = new Map(state.pendingApprovals);
       pendingApprovals.delete(id);
       const pendingQuestions = new Map(state.pendingQuestions);
@@ -90,6 +104,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         sessions: state.sessions.filter((s) => s.id !== id),
         messages,
         streamingTokens,
+        streamingTextBySession,
         pendingApprovals,
         pendingQuestions,
         deletedSessionIds,
@@ -145,14 +160,23 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const streamingTokens = new Map(state.streamingTokens);
       const key = `${sessionId}:${messageId}`;
       streamingTokens.set(key, (streamingTokens.get(key) ?? '') + token);
-      return { streamingTokens };
+      const streamingTextBySession = new Map(state.streamingTextBySession);
+      streamingTextBySession.set(sessionId, (streamingTextBySession.get(sessionId) ?? '') + token);
+      return { streamingTokens, streamingTextBySession };
     }),
 
   clearStreamTokens: (sessionId, messageId) =>
     set((state) => {
       const streamingTokens = new Map(state.streamingTokens);
       streamingTokens.delete(`${sessionId}:${messageId}`);
-      return { streamingTokens };
+      const streamingTextBySession = new Map(state.streamingTextBySession);
+      const recomputed = recomputeSessionText(streamingTokens, sessionId);
+      if (recomputed) {
+        streamingTextBySession.set(sessionId, recomputed);
+      } else {
+        streamingTextBySession.delete(sessionId);
+      }
+      return { streamingTokens, streamingTextBySession };
     }),
 
   clearSessionStreamTokens: (sessionId) =>
@@ -163,7 +187,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           streamingTokens.delete(key);
         }
       }
-      return { streamingTokens };
+      const streamingTextBySession = new Map(state.streamingTextBySession);
+      streamingTextBySession.delete(sessionId);
+      return { streamingTokens, streamingTextBySession };
     }),
 
   setPendingApproval: (sessionId, approval) =>

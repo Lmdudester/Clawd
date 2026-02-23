@@ -127,14 +127,10 @@ export function ChatView() {
     send({ type: 'get_models', sessionId: id });
   }, [id, send]);
 
-  // Collect streaming text for this session — use a narrow selector to avoid
-  // re-rendering the entire ChatView on every streaming token for other sessions
-  const streamingText = useSessionStore((s) => {
-    for (const [key, value] of s.streamingTokens) {
-      if (key.startsWith(`${id}:`)) return value;
-    }
-    return '';
-  });
+  // Collect streaming text for this session — O(1) lookup via derived Map
+  const streamingText = useSessionStore(
+    useCallback((s: { streamingTextBySession: Map<string, string> }) => s.streamingTextBySession.get(id ?? '') ?? '', [id])
+  );
 
   const isInputDisabled = session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer' || session?.status === 'terminated' || session?.status === 'starting' || session?.status === 'error';
   const isInterruptible = session?.status === 'running' || session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer';
