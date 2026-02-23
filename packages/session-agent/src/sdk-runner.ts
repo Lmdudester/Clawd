@@ -453,10 +453,12 @@ export class SDKRunner {
       }
 
       // Build system prompt
+      const hasDocker = !!process.env.DOCKER_HOST;
       const appendText = this.managerMode
         ? buildManagerPrompt()
         : [
             'You are running inside a Clawd session container.',
+            ...(hasDocker ? ['Docker is available in this session — you can use `docker` commands to build images, run containers, and host services.'] : []),
             'IMPORTANT: Do not explore or read source files unless the task specifically requires understanding the code.',
             'This project\'s CLAUDE.md already gives you the architecture and key paths — trust it instead of reading files to orient yourself.',
             'When a skill provides step-by-step instructions, follow them immediately without any preliminary exploration.',
