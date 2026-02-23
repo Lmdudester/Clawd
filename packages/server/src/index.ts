@@ -20,7 +20,7 @@ import { setupWebSocket } from './ws/handler.js';
 import { setupInternalWebSocket } from './ws/internal-handler.js';
 import { config } from './config.js';
 import { SessionStore } from './sessions/session-store.js';
-import { setManagerTokenValidator } from './auth/middleware.js';
+import { setManagerTokenValidator, verifyToken } from './auth/middleware.js';
 import { networkInterfaces } from 'os';
 
 // Global error handlers
@@ -101,6 +101,13 @@ server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
   const { pathname } = url;
   if (pathname === '/ws') {
+    // Validate JWT before upgrading
+    const token = url.searchParams.get('token');
+    if (!token || !verifyToken(token)) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     clientWss.handleUpgrade(req, socket, head, (ws) => clientWss.emit('connection', ws, req));
   } else if (pathname === '/internal/session') {
     // Validate shared secret before allowing the upgrade
