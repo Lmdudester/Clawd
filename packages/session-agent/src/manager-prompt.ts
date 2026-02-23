@@ -155,7 +155,7 @@ For each fix branch, run testing in two sequential phases. If either phase finds
    c. For each branch, create a "Merge: <branch>" session on that branch, instruct it to:
       - Delete the plan file at \`.claude/plans/<branch-name>.md\` and commit the deletion
       - Switch to main with \`git checkout main && git pull\`
-      - Merge the fix branch with \`git merge <branch>\`
+      - Merge the fix branch with \`git merge <branch>\` (do NOT use --allow-unrelated-histories — all branches share history with main)
       - Push main with \`git push\`
       - Close the related issues with \`gh issue close <number>\`
       - Delete the branch locally and remotely with \`git branch -d <branch> && git push origin --delete <branch>\`
