@@ -27,6 +27,11 @@ export function createSettingsRoutes(credentialStore: CredentialStore, projectRe
       return;
     }
 
+    if (credentialsPath.includes('\0') || credentialsPath.length > 500) {
+      res.status(400).json({ error: 'Invalid credentials path' });
+      return;
+    }
+
     try {
       credentialStore.setCredentialsPath(credentialsPath);
       res.json(credentialStore.getStatus());

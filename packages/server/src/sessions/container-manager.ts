@@ -2,6 +2,9 @@
 // Uses dockerode to create, start, stop, and remove session containers.
 
 import Docker from 'dockerode';
+import { mkdtempSync, writeFileSync, rmSync, readdirSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { config } from '../config.js';
 
 export interface SessionContainerConfig {
@@ -23,6 +26,7 @@ export interface SessionContainerConfig {
 export class ContainerManager {
   private docker: Docker;
   private containers = new Map<string, string>(); // sessionId -> containerId
+  private secretsDirs = new Map<string, string>(); // sessionId -> temp secrets dir path
 
   constructor() {
     this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
@@ -79,6 +83,25 @@ export class ContainerManager {
     } catch (err: any) {
       console.warn(`[containers] Failed to prune containers: ${err.message}`);
     }
+
+    // Clean up orphaned secret directories from previous runs
+    try {
+      const tmp = tmpdir();
+      const entries = readdirSync(tmp);
+      for (const entry of entries) {
+        if (!entry.startsWith('clawd-secrets-')) continue;
+        // Extract session ID from dir name: clawd-secrets-{sessionId}-{random}
+        const match = entry.match(/^clawd-secrets-(.+?)-[^-]+$/);
+        const sessionId = match?.[1];
+        if (sessionId && preserveSessionIds?.has(sessionId)) continue;
+        try {
+          rmSync(join(tmp, entry), { recursive: true, force: true });
+          console.log(`[containers] Cleaned up orphaned secrets dir: ${entry}`);
+        } catch {}
+      }
+    } catch (err: any) {
+      console.warn(`[containers] Failed to clean up orphaned secret dirs: ${err.message}`);
+    }
   }
 
   /**
@@ -120,26 +143,34 @@ export class ContainerManager {
     const containerName = `clawd-session-${config.instanceId}-${cfg.sessionId}`;
     console.log(`[containers] Creating container: ${containerName}`);
 
-    // Build environment variables
+    // Write secrets to temp files instead of passing as env vars
+    const secretsDir = mkdtempSync(join(tmpdir(), `clawd-secrets-${cfg.sessionId}-`));
+    writeFileSync(join(secretsDir, 'session-token'), cfg.sessionToken, { mode: 0o644 });
+    writeFileSync(
+      join(secretsDir, 'master-ws-url'),
+      `ws://${config.masterHostname}:${config.port}/internal/session?secret=${config.internalSecret}`,
+      { mode: 0o644 },
+    );
+    if (cfg.oauthToken) writeFileSync(join(secretsDir, 'oauth-token'), cfg.oauthToken, { mode: 0o644 });
+    if (cfg.githubToken) writeFileSync(join(secretsDir, 'github-token'), cfg.githubToken, { mode: 0o644 });
+    if (cfg.managerApiToken) writeFileSync(join(secretsDir, 'manager-api-token'), cfg.managerApiToken, { mode: 0o644 });
+    this.secretsDirs.set(cfg.sessionId, secretsDir);
+
+    // Build environment variables (non-secret only)
     const env: string[] = [
       `SESSION_ID=${cfg.sessionId}`,
-      `SESSION_TOKEN=${cfg.sessionToken}`,
-      `MASTER_WS_URL=ws://${config.masterHostname}:${config.port}/internal/session?secret=${config.internalSecret}`,
       `PERMISSION_MODE=${cfg.permissionMode || 'normal'}`,
       `GIT_REPO_URL=${cfg.repoUrl}`,
       `GIT_BRANCH=${cfg.branch}`,
       `ANTHROPIC_MODEL=opus`,
     ];
 
-    if (cfg.githubToken) env.push(`GITHUB_TOKEN=${cfg.githubToken}`);
     if (cfg.gitUserName) env.push(`GIT_USER_NAME=${cfg.gitUserName}`);
     if (cfg.gitUserEmail) env.push(`GIT_USER_EMAIL=${cfg.gitUserEmail}`);
-    if (cfg.oauthToken) env.push(`CLAUDE_CODE_OAUTH_TOKEN=${cfg.oauthToken}`);
 
     // Manager mode env vars
     if (cfg.managerMode) {
       env.push('MANAGER_MODE=true');
-      if (cfg.managerApiToken) env.push(`MANAGER_API_TOKEN=${cfg.managerApiToken}`);
       env.push(`MASTER_HTTP_URL=http://${config.masterHostname}:${config.port}`);
     }
 
@@ -149,6 +180,9 @@ export class ContainerManager {
     if (cfg.claudeDir) {
       binds.push(`${cfg.claudeDir}/.credentials.json:/home/node/.claude/.credentials.json:ro`);
     }
+
+    // Mount secrets directory read-only
+    binds.push(`${secretsDir}:/run/secrets:ro`);
 
     // Mount Docker socket for sessions that need container management
     if (cfg.dockerAccess) {
@@ -182,7 +216,8 @@ export class ContainerManager {
     try {
       await container.start();
     } catch (err) {
-      // Clean up the created container before propagating the error
+      // Clean up the created container and secrets before propagating the error
+      this.cleanupSecrets(cfg.sessionId);
       try {
         await container.remove({ force: true });
       } catch {
@@ -194,6 +229,14 @@ export class ContainerManager {
 
     console.log(`[containers] Container started: ${containerName} (${container.id.slice(0, 12)})`);
     return container.id;
+  }
+
+  private cleanupSecrets(sessionId: string): void {
+    const dir = this.secretsDirs.get(sessionId);
+    if (dir) {
+      try { rmSync(dir, { recursive: true, force: true }); } catch {}
+      this.secretsDirs.delete(sessionId);
+    }
   }
 
   async stopAndRemove(sessionId: string): Promise<void> {
@@ -216,6 +259,7 @@ export class ContainerManager {
       console.warn(`[containers] Failed to remove container for session ${sessionId}: ${err.message}`);
     }
 
+    this.cleanupSecrets(sessionId);
     this.containers.delete(sessionId);
   }
 

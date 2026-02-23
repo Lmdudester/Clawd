@@ -74,10 +74,16 @@ export class CredentialStore {
     if (config.hostDrivePrefix) {
       // Docker: scan mounted drive
       const usersDir = join(config.hostDrivePrefix, 'Users');
+      const resolvedUsersDir = resolve(usersDir);
       try {
         const users = readdirSync(usersDir);
         for (const user of users) {
           const claudeDir = join(usersDir, user, '.claude');
+          const resolved = resolve(claudeDir);
+          if (!resolved.startsWith(resolvedUsersDir + '/')) {
+            console.warn(`[credentials] Skipping suspicious path: ${claudeDir}`);
+            continue;
+          }
           const credFile = join(claudeDir, '.credentials.json');
           if (existsSync(credFile)) {
             paths.push(claudeDir);
@@ -99,8 +105,30 @@ export class CredentialStore {
     return paths;
   }
 
+  private validateCredentialPath(claudeDir: string): void {
+    const resolved = resolve(claudeDir);
+
+    if (config.hostDrivePrefix) {
+      const allowedPrefix = resolve(config.hostDrivePrefix, 'Users') + '/';
+      if (!resolved.startsWith(allowedPrefix)) {
+        throw new Error(`Credentials path must be within ${allowedPrefix}`);
+      }
+    } else {
+      const home = process.env.HOME || process.env.USERPROFILE || '';
+      if (!home || !resolved.startsWith(resolve(home) + '/')) {
+        throw new Error('Credentials path must be within the home directory');
+      }
+    }
+
+    if (!resolved.endsWith('/.claude')) {
+      throw new Error('Credentials path must point to a .claude directory');
+    }
+  }
+
   // Store the selected .claude directory path and set up symlink (Docker only).
   setCredentialsPath(claudeDir: string): void {
+    this.validateCredentialPath(claudeDir);
+
     const credFile = join(claudeDir, '.credentials.json');
     if (!existsSync(credFile)) {
       throw new Error(`Credentials file not found: ${credFile}`);

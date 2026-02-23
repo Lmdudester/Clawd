@@ -1,10 +1,21 @@
 // Manager system prompt template for Independent Manager sessions.
 // This prompt instructs the manager on its role, available APIs, and the orchestration loop.
-// Environment variables MASTER_HTTP_URL, MANAGER_API_TOKEN, and GIT_REPO_URL must be set.
+// Environment variables MASTER_HTTP_URL and GIT_REPO_URL must be set.
+// MANAGER_API_TOKEN is read from /run/secrets/manager-api-token (with env var fallback).
+
+import { readFileSync } from 'fs';
+
+function readManagerSecret(): string {
+  try {
+    return readFileSync('/run/secrets/manager-api-token', 'utf-8').trim();
+  } catch {
+    return process.env.MANAGER_API_TOKEN || '';
+  }
+}
 
 export function buildManagerPrompt(): string {
   const masterHttpUrl = process.env.MASTER_HTTP_URL!;
-  const managerApiToken = process.env.MANAGER_API_TOKEN!;
+  const managerApiToken = readManagerSecret();
   const repoUrl = process.env.GIT_REPO_URL!;
   const sessionId = process.env.SESSION_ID!;
 
