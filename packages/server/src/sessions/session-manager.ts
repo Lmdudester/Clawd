@@ -154,6 +154,7 @@ export class SessionManager {
         content: `Container startup failed: ${err.message}`,
         timestamp: new Date().toISOString(),
       });
+      this.scheduleEviction(id);
     });
 
     return info;
@@ -216,7 +217,19 @@ export class SessionManager {
 
   private async startContainer(session: ManagedSession): Promise<void> {
     const claudeDir = this.credentialStore.getSelectedClaudeDir();
-    const oauthToken = (await this.credentialStore.ensureFreshToken()) ?? undefined;
+    let oauthToken = (await this.credentialStore.ensureFreshToken()) ?? undefined;
+
+    // If token is unavailable, wait briefly and retry once — covers transient
+    // refresh failures and cooldown windows that are common when multiple
+    // child sessions start concurrently.
+    if (!oauthToken) {
+      console.warn(`[session:${session.info.id}] OAuth token unavailable, retrying after delay...`);
+      await new Promise((r) => setTimeout(r, 5000));
+      oauthToken = (await this.credentialStore.ensureFreshToken()) ?? undefined;
+      if (!oauthToken) {
+        console.warn(`[session:${session.info.id}] OAuth token still unavailable — container will start without it`);
+      }
+    }
 
     const containerConfig: SessionContainerConfig = {
       sessionId: session.info.id,
@@ -255,6 +268,14 @@ export class SessionManager {
     }
     session.agentWs = ws;
     console.log(`[session:${sessionId}] Agent WebSocket registered`);
+
+    // Push current OAuth token to newly connected agent — covers the case
+    // where the token was unavailable or stale at container creation time
+    // but has since been refreshed.
+    const currentToken = this.credentialStore.getAccessToken();
+    if (currentToken) {
+      this.sendToAgent(sessionId, { type: 'token_update', token: currentToken });
+    }
   }
 
   unregisterAgentConnection(sessionId: string): void {
@@ -273,6 +294,7 @@ export class SessionManager {
         content: 'Session agent disconnected unexpectedly',
         timestamp: new Date().toISOString(),
       });
+      this.scheduleEviction(sessionId);
     }
   }
 
@@ -652,6 +674,11 @@ export class SessionManager {
     }
 
     const cleanup = async () => {
+      // Clear auto-continue timer
+      if (session.managerContinueTimer) {
+        clearTimeout(session.managerContinueTimer);
+        session.managerContinueTimer = null;
+      }
       // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
       this.updateStatus(session, 'terminated');
       // Explicitly close the agent WebSocket before nulling it so the close

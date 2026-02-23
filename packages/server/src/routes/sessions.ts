@@ -10,11 +10,16 @@ function sanitizeSessionName(name: string): string | null {
   return cleaned;
 }
 
-/** Check if the authenticated user owns the session (or is a manager API token). */
-function isSessionOwner(req: AuthRequest, sessionCreatedBy: string): boolean {
-  // Manager API tokens are authorized for sessions they manage
-  if (req.managerApiToken) return true;
-  return req.user?.username === sessionCreatedBy;
+/** Check if the authenticated user owns the session (or is the managing manager). */
+function isSessionOwner(req: AuthRequest, session: { info: { createdBy: string; managedBy?: string } }, sessionManager: SessionManager): boolean {
+  if (req.managerApiToken) {
+    // Resolve which manager session this token belongs to
+    const managerId = sessionManager.findManagerByToken(req.managerApiToken);
+    if (!managerId) return false;
+    // Check: is the target session managed by this manager?
+    return session.info.managedBy === managerId;
+  }
+  return req.user?.username === session.info.createdBy;
 }
 
 export function createSessionRoutes(sessionManager: SessionManager): Router {
@@ -80,7 +85,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    if (!isSessionOwner(req, session.info.createdBy)) {
+    if (!isSessionOwner(req, session, sessionManager)) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
@@ -101,7 +106,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    if (!isSessionOwner(req, session.info.createdBy)) {
+    if (!isSessionOwner(req, session, sessionManager)) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
@@ -117,7 +122,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    if (!isSessionOwner(req, session.info.createdBy)) {
+    if (!isSessionOwner(req, session, sessionManager)) {
       res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
@@ -140,7 +145,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    if (!isSessionOwner(req, session.info.createdBy)) {
+    if (!isSessionOwner(req, session, sessionManager)) {
       res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
@@ -164,7 +169,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    if (!isSessionOwner(req, session.info.createdBy)) {
+    if (!isSessionOwner(req, session, sessionManager)) {
       res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
@@ -192,7 +197,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    if (!isSessionOwner(req, session.info.createdBy)) {
+    if (!isSessionOwner(req, session, sessionManager)) {
       res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
@@ -215,7 +220,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    if (!isSessionOwner(req, session.info.createdBy)) {
+    if (!isSessionOwner(req, session, sessionManager)) {
       res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }

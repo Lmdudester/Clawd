@@ -3,6 +3,7 @@
 // all events back to the master via the MasterClient.
 
 import { query, type SDKMessage, type Query } from '@anthropic-ai/claude-agent-sdk';
+import path from 'path';
 import { v4 as uuid } from 'uuid';
 import type { MasterClient } from './master-client.js';
 import type {
@@ -45,7 +46,7 @@ const READONLY_BASH_PATTERNS = [
 ];
 
 // Curl flags that perform writes, uploads, or output to files — deny these
-const DANGEROUS_CURL_FLAGS = /(?:^|\s)(?:-X\s+(?!GET\b)\S|-d\b|--data\b|--data-\w+\b|-F\b|--form\b|-T\b|--upload-file\b|-o\b|--output\b|-O\b|--remote-name\b)/i;
+const DANGEROUS_CURL_FLAGS = /(?:^|\s)(?:-X\s*(?!GET\b)[A-Z]|--request[=\s]\s*(?!GET\b)[A-Z]|-d\b|--data\b|--data-\w+\b|-F\b|--form\b|-T\b|--upload-file\b|-o\b|--output\b|-O\b|--remote-name\b)/i;
 
 export function isReadOnlyBash(toolName: string, input: Record<string, unknown>): boolean {
   if (toolName !== 'Bash') return false;
@@ -64,7 +65,7 @@ export function isReadOnlyBash(toolName: string, input: Record<string, unknown>)
 
   for (const sub of subCommands) {
     // Reject gh api with --method that isn't GET
-    if (/^gh\s+api\s/.test(sub) && /--method\s+(?!GET\b)/i.test(sub)) return false;
+    if (/^gh\s+api\s/.test(sub) && /(?:--method[=\s]\s*|-X\s*)(?!GET\b)[A-Z]/i.test(sub)) return false;
     // Reject curl with dangerous flags (POST, upload, output to file, etc.)
     if (/^curl\s/.test(sub) && DANGEROUS_CURL_FLAGS.test(sub)) return false;
     if (!READONLY_BASH_PATTERNS.some(p => p.test(sub))) return false;
@@ -180,7 +181,7 @@ export class SDKRunner {
   }
 
   // AsyncIterable message channel for feeding prompts to the SDK
-  private messageQueue: Array<{ resolve: (msg: any) => void }> = [];
+  private messageQueue: Array<{ resolve: (result: IteratorResult<any>) => void }> = [];
   private pendingMessages: any[] = [];
   private channelClosed = false;
 
@@ -194,9 +195,7 @@ export class SDKRunner {
           return Promise.resolve({ value: undefined as any, done: true });
         }
         return new Promise((resolve) => {
-          this.messageQueue.push({
-            resolve: (msg: any) => resolve({ value: msg, done: false }),
-          });
+          this.messageQueue.push({ resolve });
         });
       },
     }),
@@ -206,7 +205,7 @@ export class SDKRunner {
     if (this.channelClosed) return;
     if (this.messageQueue.length > 0) {
       const waiter = this.messageQueue.shift()!;
-      waiter.resolve(message);
+      waiter.resolve({ value: message, done: false });
     } else {
       if (this.pendingMessages.length >= MAX_PENDING_MESSAGES) {
         const dropped = this.pendingMessages.shift();
@@ -219,7 +218,7 @@ export class SDKRunner {
   private closeChannel(): void {
     this.channelClosed = true;
     for (const waiter of this.messageQueue) {
-      waiter.resolve(undefined);
+      waiter.resolve({ value: undefined, done: true });
     }
     this.messageQueue = [];
   }
@@ -418,9 +417,9 @@ export class SDKRunner {
             // Auto-edits: approve file mutations within CWD
             if (this.permissionMode === 'auto_edits') {
               const filePath = this.getEditFilePathForApproval(toolName, input);
-              const normalizedFile = filePath?.replace(/\\/g, '/');
-              const normalizedCwd = this.cwd.replace(/\\/g, '/');
-              if (normalizedFile && normalizedFile.startsWith(normalizedCwd + '/')) {
+              const resolvedFile = filePath ? path.resolve(this.cwd, filePath) : null;
+              const resolvedCwd = path.resolve(this.cwd);
+              if (resolvedFile && resolvedFile.startsWith(resolvedCwd + '/')) {
                 console.log(`[agent] auto-edit approved: ${toolName}`);
                 return { behavior: 'allow', updatedInput: input };
               }
