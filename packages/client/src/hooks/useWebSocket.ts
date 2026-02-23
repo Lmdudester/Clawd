@@ -42,7 +42,7 @@ export function useWebSocketProvider(): { send: SendFn; connectionStatus: Connec
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`);
     wsRef.current = ws;
     setConnectionStatus('connecting');
 

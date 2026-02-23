@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { authRouter } from './routes/auth.js';
@@ -7,6 +8,7 @@ import { createSettingsRoutes } from './routes/settings.js';
 import { createUsageRoutes } from './routes/usage.js';
 import { createRepoRoutes } from './routes/repos.js';
 import { createSkillRoutes } from './routes/skills.js';
+import { config } from './config.js';
 import type { SessionManager } from './sessions/session-manager.js';
 import type { CredentialStore } from './settings/credential-store.js';
 import type { ProjectRepoStore } from './settings/project-repos.js';
@@ -17,6 +19,11 @@ export function createApp(sessionManager: SessionManager, credentialStore: Crede
   const app = express();
 
   app.use(express.json());
+
+  app.use(cors({
+    origin: config.corsOrigins ?? false,
+    credentials: true,
+  }));
 
   // API routes
   app.use('/api/auth', authRouter);

@@ -44,6 +44,11 @@ export const config = {
 
   // Session store file path (persists session state across restarts)
   sessionStorePath: process.env.SESSION_STORE_PATH || resolve(projectRoot, 'session-store.json'),
+
+  // CORS allowed origins (null = same-origin only)
+  corsOrigins: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
+    : null,
 };
 
 if (!process.env.JWT_SECRET) {
