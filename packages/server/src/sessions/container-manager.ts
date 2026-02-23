@@ -145,15 +145,16 @@ export class ContainerManager {
 
     // Write secrets to temp files instead of passing as env vars
     const secretsDir = mkdtempSync(join(tmpdir(), `clawd-secrets-${cfg.sessionId}-`));
-    writeFileSync(join(secretsDir, 'session-token'), cfg.sessionToken, { mode: 0o644 });
+    writeFileSync(join(secretsDir, 'session-token'), cfg.sessionToken, { mode: 0o600 });
     writeFileSync(
       join(secretsDir, 'master-ws-url'),
-      `ws://${config.masterHostname}:${config.port}/internal/session?secret=${config.internalSecret}`,
-      { mode: 0o644 },
+      `ws://${config.masterHostname}:${config.port}/internal/session`,
+      { mode: 0o600 },
     );
-    if (cfg.oauthToken) writeFileSync(join(secretsDir, 'oauth-token'), cfg.oauthToken, { mode: 0o644 });
-    if (cfg.githubToken) writeFileSync(join(secretsDir, 'github-token'), cfg.githubToken, { mode: 0o644 });
-    if (cfg.managerApiToken) writeFileSync(join(secretsDir, 'manager-api-token'), cfg.managerApiToken, { mode: 0o644 });
+    writeFileSync(join(secretsDir, 'internal-secret'), config.internalSecret, { mode: 0o600 });
+    if (cfg.oauthToken) writeFileSync(join(secretsDir, 'oauth-token'), cfg.oauthToken, { mode: 0o600 });
+    if (cfg.githubToken) writeFileSync(join(secretsDir, 'github-token'), cfg.githubToken, { mode: 0o600 });
+    if (cfg.managerApiToken) writeFileSync(join(secretsDir, 'manager-api-token'), cfg.managerApiToken, { mode: 0o600 });
     this.secretsDirs.set(cfg.sessionId, secretsDir);
 
     // Build environment variables (non-secret only)

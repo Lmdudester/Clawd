@@ -19,6 +19,7 @@ import { Notifier } from './notifications/notifier.js';
 import { setupWebSocket } from './ws/handler.js';
 import { setupInternalWebSocket } from './ws/internal-handler.js';
 import { config } from './config.js';
+import { migrateAllPasswords, initTestCredentials } from './routes/auth.js';
 import { SessionStore } from './sessions/session-store.js';
 import { setManagerTokenValidator, verifyToken } from './auth/middleware.js';
 import { networkInterfaces } from 'os';
@@ -110,13 +111,18 @@ server.on('upgrade', (req, socket, head) => {
     }
     clientWss.handleUpgrade(req, socket, head, (ws) => clientWss.emit('connection', ws, req));
   } else if (pathname === '/internal/session') {
-    // Validate shared secret before allowing the upgrade
-    const secret = url.searchParams.get('secret');
+    // Validate shared secret — prefer header, fall back to query param for backward compatibility
+    const headerSecret = req.headers['x-internal-secret'] as string | undefined;
+    const querySecret = url.searchParams.get('secret');
+    const secret = headerSecret || querySecret;
     if (secret !== config.internalSecret) {
       console.warn('[internal-ws] Rejected upgrade: invalid or missing secret');
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
       return;
+    }
+    if (!headerSecret && querySecret) {
+      console.warn('[internal-ws] Secret passed via query parameter (deprecated) — update session containers to use X-Internal-Secret header');
     }
     internalWss.handleUpgrade(req, socket, head, (ws) => internalWss.emit('connection', ws, req));
   } else {
@@ -139,6 +145,10 @@ process.on('SIGTERM', shutdown);
 // Initialize container manager before accepting requests
 containerManager.initialize(restoredSessionIds.size > 0 ? restoredSessionIds : undefined).then(async () => {
   console.log('[containers] Container manager initialized');
+
+  // Run auth initialization (async bcrypt operations) before accepting requests
+  await migrateAllPasswords();
+  await initTestCredentials();
 
   // Restore sessions from persisted state
   if (restoredSessionIds.size > 0) {
