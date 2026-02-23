@@ -9,12 +9,28 @@ import { MasterClient } from './master-client.js';
 import { SDKRunner } from './sdk-runner.js';
 import type { ClawdConfig, PermissionMode } from '@clawd/shared';
 
+function readSecret(name: string, envFallback?: string): string | undefined {
+  const filePath = `/run/secrets/${name}`;
+  try {
+    return readFileSync(filePath, 'utf-8').trim();
+  } catch {
+    return envFallback ? process.env[envFallback] : undefined;
+  }
+}
+
 const SESSION_ID = process.env.SESSION_ID;
-const SESSION_TOKEN = process.env.SESSION_TOKEN;
-const MASTER_WS_URL = process.env.MASTER_WS_URL || 'ws://clawd:4000/internal/session';
+const SESSION_TOKEN = readSecret('session-token', 'SESSION_TOKEN');
+const MASTER_WS_URL = readSecret('master-ws-url', 'MASTER_WS_URL') || 'ws://clawd:4000/internal/session';
 const PERMISSION_MODE = (process.env.PERMISSION_MODE || 'normal') as PermissionMode;
 const MANAGER_MODE = process.env.MANAGER_MODE === 'true';
 const WORKSPACE = '/workspace';
+
+// Populate process.env with file-based secrets so the SDK and child processes
+// can read them via process.env (e.g. CLAUDE_CODE_OAUTH_TOKEN for the Agent SDK).
+const oauthToken = readSecret('oauth-token', 'CLAUDE_CODE_OAUTH_TOKEN');
+if (oauthToken) process.env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
+const githubToken = readSecret('github-token', 'GITHUB_TOKEN');
+if (githubToken) process.env.GITHUB_TOKEN = githubToken;
 
 if (!SESSION_ID || !SESSION_TOKEN) {
   console.error('[agent] Missing required env vars: SESSION_ID, SESSION_TOKEN');
@@ -53,6 +69,8 @@ async function main() {
         'ANTHROPIC_API_KEY',
         'SESSION_AUTH_TOKEN',
         'GH_TOKEN',
+        'MASTER_WS_URL',
+        'MANAGER_API_TOKEN',
       ]);
       const strippedVars = Object.keys(process.env).filter((key) => sensitiveNames.has(key));
       if (strippedVars.length > 0) {
