@@ -31,6 +31,9 @@ interface ManagedSession {
   managerApiToken: string | null;
   managerContinueTimer: ReturnType<typeof setTimeout> | null;
   managerResumeTimer: ReturnType<typeof setTimeout> | null;
+  managerEventBatchTimer: ReturnType<typeof setTimeout> | null;
+  managerConsecutiveFastTurns: number;
+  managerLastTurnSentAt: number;
   managerState: ManagerState | null;
   pendingManagerEvents: string[];
 }
@@ -45,6 +48,15 @@ const TERMINATED_SESSION_TTL_MS = 5 * 60 * 1000;
 
 // How long a managed child can go without agent messages before considered stale.
 const CHILD_ACTIVITY_TIMEOUT_MS = 30_000;
+
+// Minimum batch window before delivering queued manager events.
+const MANAGER_EVENT_BATCH_DELAY_MS = 2_000;
+
+// A manager turn completing faster than this (with low output) is considered "fast" / zero-progress.
+const MANAGER_FAST_TURN_THRESHOLD_MS = 3_000;
+
+// Maximum backoff delay for consecutive fast turns.
+const MANAGER_MAX_BACKOFF_DELAY_MS = 60_000;
 
 export class SessionManager {
   private sessions = new Map<string, ManagedSession>();
@@ -134,6 +146,9 @@ export class SessionManager {
       managerApiToken: managerMode ? uuid() : null,
       managerContinueTimer: null,
       managerResumeTimer: null,
+      managerEventBatchTimer: null,
+      managerConsecutiveFastTurns: 0,
+      managerLastTurnSentAt: 0,
       managerState,
       pendingManagerEvents: [],
     };
@@ -419,15 +434,22 @@ export class SessionManager {
           isError: message.isError,
           contextUsage: message.contextUsage,
         });
-        // For manager sessions: deliver queued events or fall back to auto-continue
+        // For manager sessions: track turn speed and deliver queued events with backoff
         if (session.info.isManager) {
-          if (session.pendingManagerEvents.length > 0) {
-            const events = session.pendingManagerEvents.splice(0);
-            const combined = events.join('\n\n---\n\n');
-            setTimeout(() => this.sendMessage(sessionId, combined, 'child_event'), 500);
+          const turnDuration = session.managerLastTurnSentAt > 0
+            ? Date.now() - session.managerLastTurnSentAt
+            : Infinity;
+          const outputTokens = message.contextUsage?.lastTurnOutputTokens ?? Infinity;
+          const isFastTurn = turnDuration < MANAGER_FAST_TURN_THRESHOLD_MS && outputTokens < 50;
+
+          if (isFastTurn) {
+            session.managerConsecutiveFastTurns++;
+            console.log(`[session:${sessionId}] Manager fast turn detected (${turnDuration}ms, ${outputTokens} tokens, streak=${session.managerConsecutiveFastTurns})`);
           } else {
-            this.scheduleManagerContinue(sessionId);
+            session.managerConsecutiveFastTurns = 0;
           }
+
+          this.scheduleManagerEventDelivery(sessionId);
         }
         break;
 
@@ -552,11 +574,16 @@ export class SessionManager {
     session.pendingApproval = null;
     session.pendingQuestion = null;
 
-    // Clear manager auto-continue timer on interrupt
+    // Clear manager timers on interrupt
     if (session.managerContinueTimer) {
       clearTimeout(session.managerContinueTimer);
       session.managerContinueTimer = null;
     }
+    if (session.managerEventBatchTimer) {
+      clearTimeout(session.managerEventBatchTimer);
+      session.managerEventBatchTimer = null;
+    }
+    session.managerConsecutiveFastTurns = 0;
 
     this.sendToAgent(sessionId, { type: 'interrupt' });
   }
@@ -594,10 +621,14 @@ export class SessionManager {
 
     session.info.managerState = session.managerState;
 
-    // Clear any pending auto-continue timer
+    // Clear any pending auto-continue and batch timers
     if (session.managerContinueTimer) {
       clearTimeout(session.managerContinueTimer);
       session.managerContinueTimer = null;
+    }
+    if (session.managerEventBatchTimer) {
+      clearTimeout(session.managerEventBatchTimer);
+      session.managerEventBatchTimer = null;
     }
 
     // If currently running, interrupt the current turn
@@ -650,13 +681,8 @@ export class SessionManager {
 
     // If idle, deliver queued events or fall back to auto-continue
     if (session.info.status === 'idle') {
-      if (session.pendingManagerEvents.length > 0) {
-        const events = session.pendingManagerEvents.splice(0);
-        const combined = events.join('\n\n---\n\n');
-        setTimeout(() => this.sendMessage(sessionId, combined, 'child_event'), 500);
-      } else {
-        this.scheduleManagerContinue(sessionId);
-      }
+      session.managerConsecutiveFastTurns = 0; // reset on explicit resume
+      this.scheduleManagerEventDelivery(sessionId);
     }
   }
 
@@ -726,6 +752,12 @@ export class SessionManager {
       if (session.managerContinueTimer) {
         clearTimeout(session.managerContinueTimer);
         session.managerContinueTimer = null;
+      }
+
+      // Clear event batch timer
+      if (session.managerEventBatchTimer) {
+        clearTimeout(session.managerEventBatchTimer);
+        session.managerEventBatchTimer = null;
       }
 
       // Clear auto-resume timer
@@ -818,6 +850,56 @@ export class SessionManager {
     }
   }
 
+  // Compute delivery delay with exponential backoff based on consecutive fast turns.
+  private getManagerDeliveryDelay(session: ManagedSession): number {
+    const n = session.managerConsecutiveFastTurns;
+    if (n <= 0) return MANAGER_EVENT_BATCH_DELAY_MS;
+    const backoff = MANAGER_EVENT_BATCH_DELAY_MS * Math.pow(2, n - 1);
+    return Math.min(backoff, MANAGER_MAX_BACKOFF_DELAY_MS);
+  }
+
+  // Unified event delivery: batches pending events and delivers them after a debounced delay.
+  private scheduleManagerEventDelivery(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session?.info.isManager || !session.managerState) return;
+
+    // Do not deliver if paused
+    if (session.managerState.paused) return;
+
+    // Debounce: if a batch timer is already running, new events are absorbed into the existing window
+    if (session.managerEventBatchTimer) return;
+
+    const delay = Math.max(MANAGER_EVENT_BATCH_DELAY_MS, this.getManagerDeliveryDelay(session));
+
+    if (session.managerConsecutiveFastTurns > 0) {
+      console.log(`[session:${sessionId}] Manager backoff: ${delay}ms (${session.managerConsecutiveFastTurns} consecutive fast turns)`);
+    }
+
+    session.managerEventBatchTimer = setTimeout(() => {
+      session.managerEventBatchTimer = null;
+      const s = this.sessions.get(sessionId);
+      if (!s || s.info.status !== 'idle' || !s.info.isManager) return;
+      if (s.managerState?.paused) return;
+
+      if (s.pendingManagerEvents.length > 0) {
+        const events = s.pendingManagerEvents.splice(0);
+        const combined = events.join('\n\n---\n\n');
+
+        // Cancel any existing auto-continue timer since we're delivering events directly
+        if (s.managerContinueTimer) {
+          clearTimeout(s.managerContinueTimer);
+          s.managerContinueTimer = null;
+        }
+
+        s.managerLastTurnSentAt = Date.now();
+        this.sendMessage(sessionId, combined, 'child_event');
+      } else {
+        // No events accumulated — fall through to auto-continue
+        this.scheduleManagerContinue(sessionId);
+      }
+    }, delay);
+  }
+
   // Auto-continue logic for manager sessions.
   // When a manager goes idle, ping it after a short delay to keep the loop going.
   private scheduleManagerContinue(sessionId: string): void {
@@ -838,6 +920,9 @@ export class SessionManager {
     const childIds = session.managerState.childSessionIds;
     if (childIds.length > 0) return;
 
+    // Apply backoff to auto-continue delay too
+    const delay = Math.max(3000, this.getManagerDeliveryDelay(session));
+
     // No live children (setup phase or all done) — auto-continue
     session.managerContinueTimer = setTimeout(() => {
       session.managerContinueTimer = null;
@@ -852,9 +937,10 @@ export class SessionManager {
         ? ` Remember: focus on ${prefs.focus === 'bugs' ? 'bugs only' : prefs.focus === 'enhancements' ? 'enhancements only' : 'both bugs and enhancements'}.`
         : '';
 
+      s.managerLastTurnSentAt = Date.now();
       console.log(`[session:${sessionId}] Auto-continuing manager session`);
       this.sendMessage(sessionId, `Continue your manager loop. Check on child sessions and proceed with the next step.${focusReminder}`, 'auto_continue');
-    }, 3000);
+    }, delay);
   }
 
   private showManagerOnboarding(sessionId: string): void {
@@ -1072,15 +1158,9 @@ Approval ID: ${approval.id}`;
   }
 
   private deliverOrQueueManagerEvent(managerId: string, manager: ManagedSession, message: string): void {
+    manager.pendingManagerEvents.push(message);
     if (manager.info.status === 'idle') {
-      // Cancel auto-continue since we have a specific event
-      if (manager.managerContinueTimer) {
-        clearTimeout(manager.managerContinueTimer);
-        manager.managerContinueTimer = null;
-      }
-      this.sendMessage(managerId, message, 'child_event');
-    } else {
-      manager.pendingManagerEvents.push(message);
+      this.scheduleManagerEventDelivery(managerId);
     }
   }
 
