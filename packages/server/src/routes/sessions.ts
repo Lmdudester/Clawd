@@ -11,13 +11,13 @@ function sanitizeSessionName(name: string): string | null {
 }
 
 /** Check if the authenticated user owns the session (or is the managing manager). */
-function isSessionOwner(req: AuthRequest, session: { info: { createdBy: string; managedBy?: string } }, sessionManager: SessionManager): boolean {
+function isSessionOwner(req: AuthRequest, session: { info: { id: string; createdBy: string; managedBy?: string } }, sessionManager: SessionManager): boolean {
   if (req.managerApiToken) {
     // Resolve which manager session this token belongs to
     const managerId = sessionManager.findManagerByToken(req.managerApiToken);
     if (!managerId) return false;
-    // Check: is the target session managed by this manager?
-    return session.info.managedBy === managerId;
+    // Allow if: target is this manager itself, or a child managed by it
+    return session.info.id === managerId || session.info.managedBy === managerId;
   }
   return req.user?.username === session.info.createdBy;
 }
