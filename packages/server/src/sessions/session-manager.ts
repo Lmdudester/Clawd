@@ -911,7 +911,7 @@ export class SessionManager {
    * Restore sessions from disk on startup.
    * Returns the list of restored session IDs (for container re-attachment).
    */
-  restoreSessions(state: PersistedState): string[] {
+  restoreSessions(state: PersistedState | null): string[] {
     if (!state) return [];
 
     const restoredIds: string[] = [];
