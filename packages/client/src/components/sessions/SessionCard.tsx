@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { SessionInfo } from '@clawd/shared';
 import { StatusBadge } from '../common/StatusBadge';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { api } from '../../lib/api';
@@ -35,10 +37,15 @@ export function SessionCard({ session }: { session: SessionInfo }) {
   const removeSession = useSessionStore((s) => s.removeSession);
   const addSession = useSessionStore((s) => s.addSession);
   const addNotification = useNotificationStore((s) => s.addNotification);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleClose = async (e: React.MouseEvent) => {
+  const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(`Delete session "${session.name}"?`)) return;
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setConfirmOpen(false);
     removeSession(session.id);
     try {
       await api.deleteSession(session.id);
@@ -49,8 +56,18 @@ export function SessionCard({ session }: { session: SessionInfo }) {
   };
 
   return (
-    <div
-      role="link"
+    <>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete session"
+        message={`Delete session "${session.name}"?`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
+      <div
+        role="link"
       tabIndex={0}
       onClick={() => navigate(`/session/${session.id}`)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/session/${session.id}`); } }}
@@ -127,6 +144,7 @@ export function SessionCard({ session }: { session: SessionInfo }) {
         </div>
         <span className="text-sm text-slate-300 bg-blue-950/40 border border-blue-800/50 px-2 py-0.5 rounded">{new Date(session.createdAt).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
