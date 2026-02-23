@@ -71,12 +71,11 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
         }
       }
 
-      const session = await sessionManager.createSession(sanitizedName, repoUrl, branch, !!dockerAccess, !!managerMode, createdBy);
-
-      // Apply requested permission mode (validated against the same allowlist as settings)
-      if (permissionMode && ['normal', 'auto_edits', 'dangerous', 'plan'].includes(permissionMode)) {
-        sessionManager.updateSessionSettings(session.id, { permissionMode });
-      }
+      // Validate and pass permission mode directly so it's set before the container starts
+      const validatedMode = permissionMode && ['normal', 'auto_edits', 'dangerous', 'plan'].includes(permissionMode)
+        ? permissionMode as import('@clawd/shared').PermissionMode
+        : undefined;
+      const session = await sessionManager.createSession(sanitizedName, repoUrl, branch, !!dockerAccess, !!managerMode, createdBy, validatedMode);
 
       // Auto-link child to parent manager
       if (managerId) {
