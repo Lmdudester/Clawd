@@ -8,6 +8,7 @@ export type SessionStatus =
   | 'running'
   | 'awaiting_approval'
   | 'awaiting_answer'
+  | 'reconnecting'
   | 'error'
   | 'terminated';
 

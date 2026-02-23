@@ -28,7 +28,7 @@ export class ContainerManager {
     this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
   }
 
-  async initialize(): Promise<void> {
+  async initialize(preserveSessionIds?: Set<string>): Promise<void> {
     console.log('[containers] Initializing container manager...');
 
     // Ensure the bridge network exists
@@ -43,11 +43,11 @@ export class ContainerManager {
       });
     }
 
-    // Prune stale session containers from previous runs
-    await this.pruneStaleContainers();
+    // Prune stale session containers from previous runs (skip preserved sessions)
+    await this.pruneStaleContainers(preserveSessionIds);
   }
 
-  private async pruneStaleContainers(): Promise<void> {
+  private async pruneStaleContainers(preserveSessionIds?: Set<string>): Promise<void> {
     try {
       const containers = await this.docker.listContainers({
         all: true,
@@ -58,6 +58,12 @@ export class ContainerManager {
       });
 
       for (const container of containers) {
+        const sessionId = container.Labels?.['clawd.session.id'];
+        if (sessionId && preserveSessionIds?.has(sessionId)) {
+          console.log(`[containers] Preserving restored container: ${container.Names?.[0]} (session: ${sessionId})`);
+          continue;
+        }
+
         const c = this.docker.getContainer(container.Id);
         try {
           if (container.State === 'running') {
@@ -73,6 +79,41 @@ export class ContainerManager {
     } catch (err: any) {
       console.warn(`[containers] Failed to prune containers: ${err.message}`);
     }
+  }
+
+  /**
+   * Find all running session containers for this instance.
+   * Returns a map of sessionId -> containerId.
+   */
+  async findRunningContainers(): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    try {
+      const containers = await this.docker.listContainers({
+        filters: {
+          label: [
+            'clawd.session=true',
+            `clawd.instance.id=${config.instanceId}`,
+          ],
+          status: ['running'],
+        },
+      });
+
+      for (const container of containers) {
+        const sessionId = container.Labels?.['clawd.session.id'];
+        if (sessionId) {
+          result.set(sessionId, container.Id);
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[containers] Failed to find running containers: ${err.message}`);
+    }
+    return result;
+  }
+
+  /** Register an existing running container without creating/starting it. */
+  reattachContainer(sessionId: string, containerId: string): void {
+    this.containers.set(sessionId, containerId);
+    console.log(`[containers] Re-attached container for session ${sessionId} (${containerId.slice(0, 12)})`);
   }
 
   async createSessionContainer(cfg: SessionContainerConfig): Promise<string> {

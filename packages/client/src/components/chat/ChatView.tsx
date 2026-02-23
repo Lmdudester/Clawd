@@ -132,7 +132,7 @@ export function ChatView() {
     useCallback((s: { streamingTextBySession: Map<string, string> }) => s.streamingTextBySession.get(id ?? '') ?? '', [id])
   );
 
-  const isInputDisabled = session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer' || session?.status === 'terminated' || session?.status === 'starting' || session?.status === 'error';
+  const isInputDisabled = session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer' || session?.status === 'terminated' || session?.status === 'starting' || session?.status === 'error' || session?.status === 'reconnecting';
   const isInterruptible = session?.status === 'running' || session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer';
   const isManagerPaused = !!session?.isManager && !!session?.managerState?.paused;
 

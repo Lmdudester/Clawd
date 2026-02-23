@@ -11,7 +11,7 @@ export const config = {
   host: process.env.CLAWD_HOST || 'localhost',
 
   // Shared secret for authenticating internal WebSocket connections from session containers.
-  // Generated fresh on each startup so it's never reused across restarts.
+  // Initialized with a random value; overwritten at startup with persisted value if available.
   internalSecret: randomBytes(32).toString('hex'),
   hostDrivePrefix: process.env.HOST_DRIVE_PREFIX || '',
   jwtSecret: process.env.JWT_SECRET || randomBytes(32).toString('hex'),
@@ -41,6 +41,9 @@ export const config = {
 
   // Project repos config file path
   projectReposPath: process.env.PROJECT_REPOS_PATH || resolve(projectRoot, 'project-repos.json'),
+
+  // Session store file path (persists session state across restarts)
+  sessionStorePath: process.env.SESSION_STORE_PATH || resolve(projectRoot, 'session-store.json'),
 };
 
 if (!process.env.JWT_SECRET) {
