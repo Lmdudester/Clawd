@@ -37,7 +37,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 401) {
     const body = await res.json().catch(() => ({ error: 'Unauthorized' }));
-    useAuthStore.getState().logout();
+    if (path !== '/auth/login') {
+      useAuthStore.getState().logout();
+    }
     throw new Error(body.error || 'Unauthorized');
   }
 
