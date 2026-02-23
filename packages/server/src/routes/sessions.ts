@@ -233,7 +233,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    if (!isSessionOwner(req, session.info.createdBy)) {
+    if (!isSessionOwner(req, session, sessionManager)) {
       res.status(403).json({ error: 'Not authorized for this session' });
       return;
     }
