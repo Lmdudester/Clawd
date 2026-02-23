@@ -11,7 +11,10 @@ vi.mock('../config.js', () => ({
   },
 }));
 
-// Mock fs to provide test credentials
+// Pre-computed bcrypt hash of 'secret123' (10 rounds) — migration is a no-op with this
+const HASHED_SECRET123 = '$2b$10$VwQWypA1XeL1mtZXY4nkMO0ZV3ww/EVu/V019XXtjBEiIccPGx.Ke';
+
+// Mock fs to provide test credentials with pre-hashed passwords
 vi.mock('fs', async (importOriginal) => {
   const orig = await importOriginal<typeof import('fs')>();
   return {
@@ -20,12 +23,13 @@ vi.mock('fs', async (importOriginal) => {
       if (path === '/nonexistent/credentials.json') {
         return JSON.stringify({
           users: [
-            { username: 'admin', password: 'secret123' },
+            { username: 'admin', password: HASHED_SECRET123 },
           ],
         });
       }
       return orig.readFileSync(path, 'utf-8');
     }),
+    writeFileSync: vi.fn(),
   };
 });
 

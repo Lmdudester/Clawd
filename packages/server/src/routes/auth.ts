@@ -44,13 +44,35 @@ function isBcryptHash(password: string): boolean {
   return /^\$2[aby]?\$/.test(password);
 }
 
-/** Verify a password against a stored value (bcrypt hash or plaintext for migration). */
-function verifyPassword(inputPassword: string, storedPassword: string): boolean {
-  if (isBcryptHash(storedPassword)) {
-    return bcrypt.compareSync(inputPassword, storedPassword);
+/** Hash all plaintext passwords in the credentials file at startup. */
+function migrateAllPasswords(): void {
+  const credentials = loadCredentials();
+  let migrated = 0;
+
+  for (const user of credentials.users) {
+    if (!isBcryptHash(user.password)) {
+      user.password = bcrypt.hashSync(user.password, BCRYPT_ROUNDS);
+      migrated++;
+      console.log(`[auth] Migrated plaintext password to bcrypt for user "${user.username}"`);
+    }
   }
-  // Plaintext fallback for migration
-  return inputPassword === storedPassword;
+
+  if (migrated > 0) {
+    saveCredentials(credentials);
+    console.log(`[auth] Bulk migration complete: ${migrated} of ${credentials.users.length} users migrated`);
+  }
+}
+
+// Run bulk migration at module load time
+migrateAllPasswords();
+
+/** Verify a password against a stored bcrypt hash. */
+function verifyPassword(inputPassword: string, storedPassword: string): boolean {
+  if (!isBcryptHash(storedPassword)) {
+    console.error('[auth] Non-bcrypt password found — this should not happen after migration');
+    return false;
+  }
+  return bcrypt.compareSync(inputPassword, storedPassword);
 }
 
 router.post('/login', loginLimiter, (req, res) => {
@@ -72,7 +94,7 @@ router.post('/login', loginLimiter, (req, res) => {
       console.warn('[auth] Test credentials are active — do not use in production');
       credentials.users.push({
         username: process.env.CLAWD_TEST_USER,
-        password: process.env.CLAWD_TEST_PASSWORD,
+        password: bcrypt.hashSync(process.env.CLAWD_TEST_PASSWORD, BCRYPT_ROUNDS),
       });
     }
   }
@@ -85,17 +107,6 @@ router.post('/login', loginLimiter, (req, res) => {
     const error: ErrorResponse = { error: 'Invalid credentials' };
     res.status(401).json(error);
     return;
-  }
-
-  // Auto-migrate plaintext passwords to bcrypt hashes on successful login
-  if (!isBcryptHash(user.password)) {
-    console.log(`[auth] Migrating plaintext password to bcrypt for user "${username}"`);
-    const persistedCredentials = loadCredentials();
-    const persistedUser = persistedCredentials.users.find((u) => u.username === username);
-    if (persistedUser) {
-      persistedUser.password = bcrypt.hashSync(password, BCRYPT_ROUNDS);
-      saveCredentials(persistedCredentials);
-    }
   }
 
   const token = jwt.sign({ username: user.username }, config.jwtSecret, {
