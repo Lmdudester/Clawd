@@ -45,13 +45,13 @@ function isBcryptHash(password: string): boolean {
 }
 
 /** Hash all plaintext passwords in the credentials file at startup. */
-function migrateAllPasswords(): void {
+async function migrateAllPasswords(): Promise<void> {
   const credentials = loadCredentials();
   let migrated = 0;
 
   for (const user of credentials.users) {
     if (!isBcryptHash(user.password)) {
-      user.password = bcrypt.hashSync(user.password, BCRYPT_ROUNDS);
+      user.password = await bcrypt.hash(user.password, BCRYPT_ROUNDS);
       migrated++;
       console.log(`[auth] Migrated plaintext password to bcrypt for user "${user.username}"`);
     }
@@ -63,58 +63,76 @@ function migrateAllPasswords(): void {
   }
 }
 
-// Run bulk migration at module load time
-migrateAllPasswords();
+/** Pre-hashed test credentials, computed once at startup. */
+let testCredentials: { username: string; password: string } | null = null;
+
+/** Hash test credentials once at startup instead of on every login request. */
+async function initTestCredentials(): Promise<void> {
+  if (process.env.CLAWD_TEST_USER && process.env.CLAWD_TEST_PASSWORD) {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[auth] CLAWD_TEST_USER/CLAWD_TEST_PASSWORD are set but ignored in production');
+      return;
+    }
+    console.warn('[auth] Test credentials are active — do not use in production');
+    testCredentials = {
+      username: process.env.CLAWD_TEST_USER,
+      password: await bcrypt.hash(process.env.CLAWD_TEST_PASSWORD, BCRYPT_ROUNDS),
+    };
+  }
+}
 
 /** Verify a password against a stored bcrypt hash. */
-function verifyPassword(inputPassword: string, storedPassword: string): boolean {
+async function verifyPassword(inputPassword: string, storedPassword: string): Promise<boolean> {
   if (!isBcryptHash(storedPassword)) {
     console.error('[auth] Non-bcrypt password found — this should not happen after migration');
     return false;
   }
-  return bcrypt.compareSync(inputPassword, storedPassword);
+  return bcrypt.compare(inputPassword, storedPassword);
 }
 
-router.post('/login', loginLimiter, (req, res) => {
-  const { username, password } = req.body as LoginRequest;
+router.post('/login', loginLimiter, async (req, res) => {
+  try {
+    const { username, password } = req.body as LoginRequest;
 
-  if (!username || !password) {
-    const error: ErrorResponse = { error: 'Username and password are required' };
-    res.status(400).json(error);
-    return;
-  }
-
-  const credentials = loadCredentials();
-
-  // Allow env-based test credentials (for automated E2E testing, non-production only)
-  if (process.env.CLAWD_TEST_USER && process.env.CLAWD_TEST_PASSWORD) {
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('[auth] CLAWD_TEST_USER/CLAWD_TEST_PASSWORD are set but ignored in production');
-    } else {
-      console.warn('[auth] Test credentials are active — do not use in production');
-      credentials.users.push({
-        username: process.env.CLAWD_TEST_USER,
-        password: bcrypt.hashSync(process.env.CLAWD_TEST_PASSWORD, BCRYPT_ROUNDS),
-      });
+    if (!username || !password) {
+      const error: ErrorResponse = { error: 'Username and password are required' };
+      res.status(400).json(error);
+      return;
     }
+
+    const credentials = loadCredentials();
+
+    // Include pre-hashed test credentials if available
+    if (testCredentials) {
+      credentials.users.push(testCredentials);
+    }
+
+    // Use for...of loop since verifyPassword is now async
+    let matchedUser: { username: string; password: string } | undefined;
+    for (const u of credentials.users) {
+      if (u.username === username && await verifyPassword(password, u.password)) {
+        matchedUser = u;
+        break;
+      }
+    }
+
+    if (!matchedUser) {
+      const error: ErrorResponse = { error: 'Invalid credentials' };
+      res.status(401).json(error);
+      return;
+    }
+
+    const token = jwt.sign({ username: matchedUser.username }, config.jwtSecret, {
+      expiresIn: '7d',
+    });
+
+    const response: LoginResponse = { token };
+    res.json(response);
+  } catch (err) {
+    console.error('[auth] Login error:', err);
+    const error: ErrorResponse = { error: 'Internal server error' };
+    res.status(500).json(error);
   }
-
-  const user = credentials.users.find(
-    (u) => u.username === username && verifyPassword(password, u.password)
-  );
-
-  if (!user) {
-    const error: ErrorResponse = { error: 'Invalid credentials' };
-    res.status(401).json(error);
-    return;
-  }
-
-  const token = jwt.sign({ username: user.username }, config.jwtSecret, {
-    expiresIn: '7d',
-  });
-
-  const response: LoginResponse = { token };
-  res.json(response);
 });
 
-export { router as authRouter };
+export { router as authRouter, migrateAllPasswords, initTestCredentials };

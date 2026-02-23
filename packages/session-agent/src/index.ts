@@ -21,6 +21,7 @@ function readSecret(name: string, envFallback?: string): string | undefined {
 const SESSION_ID = process.env.SESSION_ID;
 const SESSION_TOKEN = readSecret('session-token', 'SESSION_TOKEN');
 const MASTER_WS_URL = readSecret('master-ws-url', 'MASTER_WS_URL') || 'ws://clawd:4000/internal/session';
+const INTERNAL_SECRET = readSecret('internal-secret');
 const PERMISSION_MODE = (process.env.PERMISSION_MODE || 'normal') as PermissionMode;
 const MANAGER_MODE = process.env.MANAGER_MODE === 'true';
 const WORKSPACE = '/workspace';
@@ -39,7 +40,7 @@ if (!SESSION_ID || !SESSION_TOKEN) {
 
 async function main() {
   // 1. Connect to master
-  const masterClient = new MasterClient(MASTER_WS_URL, SESSION_ID!, SESSION_TOKEN!);
+  const masterClient = new MasterClient(MASTER_WS_URL, SESSION_ID!, SESSION_TOKEN!, INTERNAL_SECRET);
   await masterClient.connect();
 
   // 2. Read .clawd.yml if it exists (skip for manager sessions — no repo)

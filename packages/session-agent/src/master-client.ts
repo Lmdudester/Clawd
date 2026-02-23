@@ -20,6 +20,7 @@ export class MasterClient {
     private masterUrl: string,
     private sessionId: string,
     private sessionToken: string,
+    private internalSecret?: string,
   ) {}
 
   onMessage(handler: MessageHandler): void {
@@ -35,7 +36,9 @@ export class MasterClient {
   private connectInternal(): Promise<void> {
     return new Promise((resolve, reject) => {
       console.log(`[agent] Connecting to master at ${this.masterUrl}...`);
-      this.ws = new WebSocket(this.masterUrl);
+      this.ws = new WebSocket(this.masterUrl, {
+        headers: this.internalSecret ? { 'x-internal-secret': this.internalSecret } : undefined,
+      });
 
       this.ws.on('open', () => {
         console.log('[agent] Connected to master, authenticating...');
