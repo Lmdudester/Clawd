@@ -2,7 +2,6 @@ import { useEffect, useRef, useCallback, useState, createContext, useContext } f
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNotificationStore } from '../stores/notificationStore';
-import { getReconnectDelay } from '../lib/reconnect';
 import type { ClientMessage, ServerMessage } from '@clawd/shared';
 
 type SendFn = (message: ClientMessage) => void;
@@ -19,7 +18,7 @@ export function useWebSocket(): { send: SendFn; connectionStatus: ConnectionStat
 
 export function useWebSocketProvider(): { send: SendFn; connectionStatus: ConnectionStatus } {
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttempt = useRef(0);
+  const wasConnected = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const token = useAuthStore((s) => s.token);
@@ -32,8 +31,6 @@ export function useWebSocketProvider(): { send: SendFn; connectionStatus: Connec
   const clearSessionStreamTokens = useSessionStore((s) => s.clearSessionStreamTokens);
   const setPendingApproval = useSessionStore((s) => s.setPendingApproval);
   const setPendingQuestion = useSessionStore((s) => s.setPendingQuestion);
-  const clearAllPendingApprovals = useSessionStore((s) => s.clearAllPendingApprovals);
-  const clearAllPendingQuestions = useSessionStore((s) => s.clearAllPendingQuestions);
   const setAvailableModels = useSessionStore((s) => s.setAvailableModels);
   const addNotification = useNotificationStore((s) => s.addNotification);
 
@@ -47,7 +44,7 @@ export function useWebSocketProvider(): { send: SendFn; connectionStatus: Connec
     setConnectionStatus('connecting');
 
     ws.onopen = () => {
-      reconnectAttempt.current = 0;
+      wasConnected.current = true;
       setConnectionStatus('connected');
       ws.send(JSON.stringify({ type: 'auth', token }));
     };
@@ -111,20 +108,21 @@ export function useWebSocketProvider(): { send: SendFn; connectionStatus: Connec
 
     ws.onclose = () => {
       wsRef.current = null;
-      // Clear stale pending approvals/questions — on reconnection + re-subscribe
-      // the server will re-send any still-valid ones.
-      clearAllPendingApprovals();
-      clearAllPendingQuestions();
-      const delay = getReconnectDelay(reconnectAttempt.current);
-      reconnectAttempt.current++;
+      // If we had a working connection, just refresh the page —
+      // it's faster and avoids the stale-state issues of in-place reconnection.
+      if (wasConnected.current) {
+        window.location.reload();
+        return;
+      }
+      // Initial connection hasn't succeeded yet — retry with a short delay
       setConnectionStatus('reconnecting');
-      reconnectTimer.current = setTimeout(connect, delay);
+      reconnectTimer.current = setTimeout(connect, 1000);
     };
 
     ws.onerror = () => {
       ws.close();
     };
-  }, [token, logout, updateSession, addMessages, appendStreamToken, clearStreamTokens, clearSessionStreamTokens, setPendingApproval, setPendingQuestion, clearAllPendingApprovals, clearAllPendingQuestions, setAvailableModels, addNotification]);
+  }, [token, logout, updateSession, addMessages, appendStreamToken, clearStreamTokens, clearSessionStreamTokens, setPendingApproval, setPendingQuestion, setAvailableModels, addNotification]);
 
   useEffect(() => {
     connect();
