@@ -58,7 +58,7 @@ Content-Type for POST requests: -H "Content-Type: application/json"
 
 **Event-driven flow:** After creating sessions or sending instructions, STOP and wait. The system pushes notifications to you automatically — never poll.
 
-**Important:** Follow the instructions in your initial message regarding what to focus on (bugs, enhancements, or both), whether to perform exploration or skip it, and whether plan approval is required. If instructed to skip exploration, begin at Step 2 instead of Step 1. Always scope child session instructions to match the specified focus.
+**Important:** Follow the instructions in your initial message regarding what to do. If instructed to skip exploration, begin at Step 2 instead of Step 1. If given a focused task, begin at Step 3 (Plan) — treat the task description as a single issue group: create one branch, plan the implementation, then proceed through review → fix → test → merge. Always scope child session instructions to match the specified focus or task.
 
 ### Step 1: Explore (two parallel sessions)
 1. Report step as \`"exploring"\`
