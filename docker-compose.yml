@@ -39,6 +39,7 @@ services:
 volumes:
   clawd-secrets:
     driver: local
+    name: clawd-secrets
 
 networks:
   clawd-network:
