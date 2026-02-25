@@ -1,7 +1,8 @@
 #!/bin/sh
 set -e
 
-# 1. Git credentials
+# 1. Git credentials — token is on the secrets volume, not in env
+GITHUB_TOKEN="${GITHUB_TOKEN:-$(cat /run/secrets/github-token 2>/dev/null)}"
 if [ -n "$GITHUB_TOKEN" ]; then
     printf 'https://git:%s@github.com\n' "$GITHUB_TOKEN" > "$HOME/.git-credentials"
     chmod 600 "$HOME/.git-credentials"
