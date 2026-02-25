@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import rateLimit from 'express-rate-limit';
@@ -22,7 +22,13 @@ interface Credentials {
   users: Array<{ username: string; password: string }>;
 }
 
+// In-memory cache of credentials with bcrypt-hashed passwords.
+// The credentials file may be mounted read-only (e.g. Docker :ro), so the
+// migration result is kept here and used for all authentication checks.
+let cachedCredentials: Credentials | null = null;
+
 function loadCredentials(): Credentials {
+  if (cachedCredentials) return cachedCredentials;
   try {
     const raw = readFileSync(config.credentialsPath, 'utf-8');
     return JSON.parse(raw);
@@ -31,20 +37,12 @@ function loadCredentials(): Credentials {
   }
 }
 
-function saveCredentials(credentials: Credentials): void {
-  try {
-    writeFileSync(config.credentialsPath, JSON.stringify(credentials, null, 2));
-  } catch (err) {
-    console.error('[auth] Failed to save credentials file:', err);
-  }
-}
-
 /** Check if a stored password is a bcrypt hash. */
 function isBcryptHash(password: string): boolean {
   return /^\$2[aby]?\$/.test(password);
 }
 
-/** Hash all plaintext passwords in the credentials file at startup. */
+/** Hash all plaintext passwords at startup and cache the result in memory. */
 async function migrateAllPasswords(): Promise<void> {
   const credentials = loadCredentials();
   let migrated = 0;
@@ -58,9 +56,10 @@ async function migrateAllPasswords(): Promise<void> {
   }
 
   if (migrated > 0) {
-    saveCredentials(credentials);
     console.log(`[auth] Bulk migration complete: ${migrated} of ${credentials.users.length} users migrated`);
   }
+
+  cachedCredentials = credentials;
 }
 
 /** Pre-hashed test credentials, computed once at startup. */
