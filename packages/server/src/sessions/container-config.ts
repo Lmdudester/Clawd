@@ -35,14 +35,12 @@ export function buildContainerEnv(cfg: SessionContainerConfig): string[] {
   return env;
 }
 
-export function buildContainerBinds(cfg: SessionContainerConfig, secretsDir?: string): string[] {
+export function buildContainerBinds(cfg: SessionContainerConfig): string[] {
   const binds: string[] = [];
   if (cfg.claudeDir) {
     binds.push(`${cfg.claudeDir}/.credentials.json:/home/node/.claude/.credentials.json:ro`);
   }
-  if (secretsDir) {
-    binds.push(`${secretsDir}:/run/secrets:ro`);
-  }
+  // Secrets are mounted via Docker volume subpath in Mounts, not Binds
   if (cfg.dockerAccess) {
     binds.push('/var/run/docker.sock:/var/run/docker.sock');
   }

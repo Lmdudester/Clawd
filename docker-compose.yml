@@ -12,6 +12,7 @@ services:
       - ${HOST_VOLUME_MOUNT:-./.empty}:${HOST_VOLUME_TARGET:-/host}
       - ./credentials.json:/app/credentials.json:ro
       - ./project-repos.json:/app/project-repos.json
+      - clawd-secrets:/clawd-secrets
     environment:
       - CLAWD_HOST=0.0.0.0
       - CLAWD_PORT=4000
@@ -34,6 +35,10 @@ services:
       dockerfile: Dockerfile.session
     image: clawd-session:latest
     profiles: ["build-only"]
+
+volumes:
+  clawd-secrets:
+    driver: local
 
 networks:
   clawd-network:

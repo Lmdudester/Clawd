@@ -2,10 +2,14 @@
 // Uses dockerode to create, start, stop, and remove session containers.
 
 import Docker from 'dockerode';
-import { mkdtempSync, writeFileSync, rmSync, readdirSync } from 'fs';
-import { tmpdir } from 'os';
+import { mkdirSync, writeFileSync, rmSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { randomBytes } from 'crypto';
 import { config } from '../config.js';
+
+// Base directory for session secrets — must be on a named Docker volume shared
+// between the master container and session containers so bind mounts resolve.
+const SECRETS_BASE = '/clawd-secrets';
 
 export interface SessionContainerConfig {
   sessionId: string;
@@ -86,8 +90,7 @@ export class ContainerManager {
 
     // Clean up orphaned secret directories from previous runs
     try {
-      const tmp = tmpdir();
-      const entries = readdirSync(tmp);
+      const entries = readdirSync(SECRETS_BASE);
       for (const entry of entries) {
         if (!entry.startsWith('clawd-secrets-')) continue;
         // Extract session ID from dir name: clawd-secrets-{sessionId}-{random}
@@ -95,7 +98,7 @@ export class ContainerManager {
         const sessionId = match?.[1];
         if (sessionId && preserveSessionIds?.has(sessionId)) continue;
         try {
-          rmSync(join(tmp, entry), { recursive: true, force: true });
+          rmSync(join(SECRETS_BASE, entry), { recursive: true, force: true });
           console.log(`[containers] Cleaned up orphaned secrets dir: ${entry}`);
         } catch {}
       }
@@ -143,8 +146,14 @@ export class ContainerManager {
     const containerName = `clawd-session-${config.instanceId}-${cfg.sessionId}`;
     console.log(`[containers] Creating container: ${containerName}`);
 
-    // Write secrets to temp files instead of passing as env vars
-    const secretsDir = mkdtempSync(join(tmpdir(), `clawd-secrets-${cfg.sessionId}-`));
+    // Write secrets to the shared Docker volume so session containers can bind-mount them.
+    // The master container mounts the 'clawd-secrets' volume at SECRETS_BASE; we create a
+    // unique subdirectory per session and then mount it into the session container using
+    // the volume name + subpath.
+    const suffix = randomBytes(3).toString('hex');
+    const secretsDirName = `clawd-secrets-${cfg.sessionId}-${suffix}`;
+    const secretsDir = join(SECRETS_BASE, secretsDirName);
+    mkdirSync(secretsDir, { recursive: true, mode: 0o700 });
     writeFileSync(join(secretsDir, 'session-token'), cfg.sessionToken, { mode: 0o600 });
     writeFileSync(
       join(secretsDir, 'master-ws-url'),
@@ -182,8 +191,7 @@ export class ContainerManager {
       binds.push(`${cfg.claudeDir}/.credentials.json:/home/node/.claude/.credentials.json:ro`);
     }
 
-    // Mount secrets directory read-only
-    binds.push(`${secretsDir}:/run/secrets:ro`);
+    // Secrets are mounted via Docker volume subpath (see Mounts below, not Binds)
 
     // Mount Docker socket for sessions that need container management
     if (cfg.dockerAccess) {
@@ -203,6 +211,13 @@ export class ContainerManager {
       },
       HostConfig: {
         Binds: binds.length > 0 ? binds : undefined,
+        Mounts: [{
+          Type: 'volume',
+          Source: config.secretsVolume,
+          Target: '/run/secrets',
+          ReadOnly: true,
+          VolumeOptions: { Subpath: secretsDirName },
+        } as Docker.MountSettings],
         Memory: config.sessionMemoryLimit,
         CpuShares: config.sessionCpuShares,
         PidsLimit: config.sessionPidsLimit,

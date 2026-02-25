@@ -81,9 +81,9 @@ describe('buildContainerBinds', () => {
     );
   });
 
-  it('includes secrets dir mount when secretsDir is provided', () => {
-    const binds = buildContainerBinds(baseCfg(), '/tmp/clawd-secrets-session-123-AbCdEf');
-    expect(binds).toContain('/tmp/clawd-secrets-session-123-AbCdEf:/run/secrets:ro');
+  it('does not include secrets in binds (secrets use volume subpath mount)', () => {
+    const binds = buildContainerBinds(baseCfg());
+    expect(binds.some(b => b.includes('/run/secrets'))).toBe(false);
   });
 
   it('includes docker socket when dockerAccess is true', () => {

@@ -32,6 +32,8 @@ export const config = {
   // multiple Clawd instances run on the same Docker host.
   networkName: process.env.CLAWD_NETWORK ||
     `clawd-network-${process.env.CLAWD_INSTANCE_ID || 'production'}`,
+  // Named Docker volume shared between master and session containers for secrets
+  secretsVolume: process.env.CLAWD_SECRETS_VOLUME || 'clawd-secrets',
   sessionMemoryLimit: parseInt(process.env.SESSION_MEMORY_LIMIT || String(4 * 1024 * 1024 * 1024)), // 4GB
   sessionCpuShares: parseInt(process.env.SESSION_CPU_SHARES || '512'),
   sessionPidsLimit: parseInt(process.env.SESSION_PIDS_LIMIT || '256'),
