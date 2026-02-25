@@ -22,6 +22,7 @@ services:
       - CREDENTIALS_PATH=/app/credentials.json
       - PROJECT_REPOS_PATH=/app/project-repos.json
       - GIT_BRANCH=main
+      - JWT_SECRET=${JWT_SECRET}
     env_file:
       - .env
     restart: unless-stopped
