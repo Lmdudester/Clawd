@@ -1009,9 +1009,11 @@ export class SessionManager {
       if (s.managerState?.paused) return;
 
       const prefs = s.managerState?.preferences;
-      const focusReminder = prefs
-        ? ` Remember: focus on ${prefs.focus === 'bugs' ? 'bugs only' : prefs.focus === 'enhancements' ? 'enhancements only' : 'both bugs and enhancements'}.`
-        : '';
+      const focusReminder = prefs?.focusedTask
+        ? ` Remember: you are implementing a focused task: "${prefs.focusedTask}".`
+        : prefs
+          ? ` Remember: focus on ${prefs.focus === 'bugs' ? 'bugs only' : prefs.focus === 'enhancements' ? 'enhancements only' : 'both bugs and enhancements'}.`
+          : '';
 
       s.managerLastTurnSentAt = Date.now();
       console.log(`[session:${sessionId}] Auto-continuing manager session`);
@@ -1034,7 +1036,14 @@ export class SessionManager {
             { label: 'Bugs', description: 'Find and fix bugs only' },
             { label: 'Enhancements', description: 'Find and implement enhancements only' },
             { label: 'Both', description: 'Find and address both bugs and enhancements' },
+            { label: 'Focused Task', description: 'Implement a specific task you describe — skips exploration and triage' },
           ],
+          multiSelect: false,
+        },
+        {
+          question: 'Describe the task for the manager to implement:',
+          header: 'Task',
+          options: [],
           multiSelect: false,
         },
         {
@@ -1077,18 +1086,21 @@ export class SessionManager {
     if (!session?.managerState) return;
 
     const focusAnswer = answers['What should the manager focus on?'] ?? 'Both';
+    const taskDescription = answers['Describe the task for the manager to implement:'] ?? '';
     const explorationAnswer = answers['Should the manager explore the codebase first?'] ?? 'Explore';
     const planApprovalAnswer = answers['Should the manager wait for your approval on plans?'] ?? 'Auto-proceed';
 
-    const focus: ManagerFocus =
+    const isFocusedTask = focusAnswer.toLowerCase().includes('focused');
+    const focus: ManagerFocus = isFocusedTask ? 'both' :
       focusAnswer.toLowerCase().includes('bug') ? 'bugs' :
       focusAnswer.toLowerCase().includes('enhancement') ? 'enhancements' :
       'both';
 
-    const skipExploration = explorationAnswer.toLowerCase().includes('skip');
+    const focusedTask = isFocusedTask && taskDescription.trim() ? taskDescription.trim() : undefined;
+    const skipExploration = focusedTask ? true : explorationAnswer.toLowerCase().includes('skip');
     const requirePlanApproval = planApprovalAnswer.toLowerCase().includes('require');
 
-    const preferences: ManagerPreferences = { focus, skipExploration, requirePlanApproval };
+    const preferences: ManagerPreferences = { focus, skipExploration, requirePlanApproval, focusedTask };
 
     session.managerState.preferences = preferences;
     session.info.managerState = session.managerState;
@@ -1100,7 +1112,9 @@ export class SessionManager {
       id: uuid(),
       sessionId,
       type: 'system',
-      content: `Manager configured: focus=${focus}, exploration=${skipExploration ? 'skip' : 'enabled'}, plan approval=${requirePlanApproval ? 'required' : 'auto'}`,
+      content: focusedTask
+        ? `Manager configured: mode=focused task, plan approval=${requirePlanApproval ? 'required' : 'auto'}`
+        : `Manager configured: focus=${focus}, exploration=${skipExploration ? 'skip' : 'enabled'}, plan approval=${requirePlanApproval ? 'required' : 'auto'}`,
       timestamp: new Date().toISOString(),
     });
 
@@ -1111,16 +1125,21 @@ export class SessionManager {
   }
 
   private buildManagerInitialMessage(preferences: ManagerPreferences): string {
-    const { focus, skipExploration, requirePlanApproval } = preferences;
+    const { focus, skipExploration, requirePlanApproval, focusedTask } = preferences;
+
+    const planApprovalNote = requirePlanApproval
+      ? ' Plan approval is REQUIRED — after planning and review, STOP and wait for user feedback on each plan before proceeding to fixing.'
+      : ' Plan approval is NOT required — after plans pass review, proceed to fixing automatically.';
+
+    // Focused task mode — skip explore + triage, go straight to planning
+    if (focusedTask) {
+      return `Begin your independent manager loop in FOCUSED TASK mode. Skip exploration and triage — go directly to Step 3 (Plan). Your task is:\n\n${focusedTask}\n\nTreat this as a single issue group. Create one branch, plan the implementation, then proceed through review → fix → test → merge as normal.${planApprovalNote}`;
+    }
 
     const focusDescription =
       focus === 'bugs' ? 'bugs and code quality issues' :
       focus === 'enhancements' ? 'enhancements and improvements' :
       'bugs and enhancements';
-
-    const planApprovalNote = requirePlanApproval
-      ? ' Plan approval is REQUIRED — after planning and review, STOP and wait for user feedback on each plan before proceeding to fixing.'
-      : ' Plan approval is NOT required — after plans pass review, proceed to fixing automatically.';
 
     if (skipExploration) {
       return `Begin your independent manager loop. Skip exploration — go directly to Step 2 (Triage). Focus on ${focusDescription}.${planApprovalNote}`;

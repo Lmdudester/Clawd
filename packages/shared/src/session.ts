@@ -20,6 +20,7 @@ export interface ManagerPreferences {
   focus: ManagerFocus;
   skipExploration: boolean;
   requirePlanApproval: boolean;
+  focusedTask?: string;
 }
 
 export interface ManagerState {
