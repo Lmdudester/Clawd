@@ -1,6 +1,12 @@
 #!/bin/sh
 set -e
 
+# --- Fix volume permissions and drop to node (runs once as root) ---
+if [ "$(id -u)" = "0" ]; then
+    [ -d /clawd-secrets ] && chown node:node /clawd-secrets
+    exec gosu node "$0" "$@"
+fi
+
 # --- Git identity and credential setup (optional) ---
 if [ -n "$GIT_USER_NAME" ]; then
     echo "[STARTUP] Configuring git identity..."
