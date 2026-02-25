@@ -1308,8 +1308,13 @@ Approval ID: ${approval.id}`;
         cleanupPromise: null,
         managerApiToken: persisted.managerApiToken,
         managerContinueTimer: null,
+        managerResumeTimer: null,
+        managerEventBatchTimer: null,
+        managerConsecutiveFastTurns: 0,
+        managerLastTurnSentAt: 0,
         managerState: persisted.managerState,
         cancelContainerWatch: null,
+        pendingManagerEvents: [],
       };
 
       this.sessions.set(persisted.info.id, session);
