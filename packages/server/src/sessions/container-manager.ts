@@ -210,6 +210,8 @@ export class ContainerManager {
         ...(cfg.dockerAccess ? {
           SecurityOpt: ['no-new-privileges:true'],
           CapDrop: ['ALL'],
+          // Add root group so the non-root 'node' user can access the Docker socket
+          GroupAdd: ['0'],
         } : {}),
       },
     });

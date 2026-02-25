@@ -12,13 +12,14 @@ export type SessionStatus =
   | 'error'
   | 'terminated';
 
-export type ManagerStep = 'idle' | 'exploring' | 'fixing' | 'testing' | 'merging';
+export type ManagerStep = 'idle' | 'exploring' | 'triaging' | 'planning' | 'reviewing' | 'fixing' | 'testing' | 'merging';
 
 export type ManagerFocus = 'bugs' | 'enhancements' | 'both';
 
 export interface ManagerPreferences {
   focus: ManagerFocus;
   skipExploration: boolean;
+  requirePlanApproval: boolean;
 }
 
 export interface ManagerState {
@@ -27,6 +28,7 @@ export interface ManagerState {
   childSessionIds: string[];
   preferences?: ManagerPreferences;
   paused?: boolean;
+  resumeAt?: string; // ISO 8601 timestamp — when the timed resume is scheduled
 }
 
 export interface SessionInfo {
@@ -59,12 +61,14 @@ export interface SessionMessage {
   toolInput?: Record<string, unknown>;
   timestamp: string;
   isStreaming?: boolean;
+  source?: 'child_event' | 'auto_continue';
 }
 
 export interface PendingApproval {
   id: string;
   toolName: string;
   toolInput: Record<string, unknown>;
+  reason?: string;
   timestamp: string;
 }
 

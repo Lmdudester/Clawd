@@ -32,8 +32,13 @@ interface ManagedSession {
   cleanupPromise: Promise<void> | null;
   managerApiToken: string | null;
   managerContinueTimer: ReturnType<typeof setTimeout> | null;
+  managerResumeTimer: ReturnType<typeof setTimeout> | null;
+  managerEventBatchTimer: ReturnType<typeof setTimeout> | null;
+  managerConsecutiveFastTurns: number;
+  managerLastTurnSentAt: number;
   managerState: ManagerState | null;
   cancelContainerWatch: (() => void) | null;
+  pendingManagerEvents: string[];
 }
 
 type SessionEventHandler = (sessionId: string, event: string, data: unknown) => void;
@@ -47,9 +52,22 @@ const MAX_MESSAGES_PER_SESSION = 500;
 // How long to keep terminated sessions in memory before evicting them (5 minutes).
 const TERMINATED_SESSION_TTL_MS = 5 * 60 * 1000;
 
+// How long a managed child can go without agent messages before considered stale.
+const CHILD_ACTIVITY_TIMEOUT_MS = 30_000;
+
+// Minimum batch window before delivering queued manager events.
+const MANAGER_EVENT_BATCH_DELAY_MS = 2_000;
+
+// A manager turn completing faster than this (with low output) is considered "fast" / zero-progress.
+const MANAGER_FAST_TURN_THRESHOLD_MS = 3_000;
+
+// Maximum backoff delay for consecutive fast turns.
+const MANAGER_MAX_BACKOFF_DELAY_MS = 60_000;
+
 export class SessionManager {
   private sessions = new Map<string, ManagedSession>();
   private evictionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private childActivityTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private eventHandler: SessionEventHandler | null = null;
   private credentialStore: CredentialStore;
   private containerManager: ContainerManager;
@@ -88,7 +106,7 @@ export class SessionManager {
     return this.sessions.get(sessionId)?.messages ?? [];
   }
 
-  async createSession(name: string, repoUrl: string, branch: string, dockerAccess = false, managerMode = false, createdBy = 'unknown'): Promise<SessionInfo> {
+  async createSession(name: string, repoUrl: string, branch: string, dockerAccess = false, managerMode = false, createdBy = 'unknown', permissionMode?: PermissionMode): Promise<SessionInfo> {
     // Enforce maximum session limit to prevent unbounded container creation
     if (config.maxSessions > 0) {
       const activeSessions = Array.from(this.sessions.values()).filter(
@@ -118,7 +136,7 @@ export class SessionManager {
       lastMessageAt: null,
       lastMessagePreview: null,
       totalCostUsd: 0,
-      permissionMode: managerMode ? 'dangerous' : 'normal',
+      permissionMode: permissionMode ?? (managerMode ? 'dangerous' : 'normal'),
       model: null,
       notificationsEnabled: false,
       contextUsage: null,
@@ -137,8 +155,13 @@ export class SessionManager {
       cleanupPromise: null,
       managerApiToken: managerMode ? uuid() : null,
       managerContinueTimer: null,
+      managerResumeTimer: null,
+      managerEventBatchTimer: null,
+      managerConsecutiveFastTurns: 0,
+      managerLastTurnSentAt: 0,
       managerState,
       cancelContainerWatch: null,
+      pendingManagerEvents: [],
     };
 
     this.sessions.set(id, session);
@@ -218,6 +241,25 @@ export class SessionManager {
       }
     }
     return null;
+  }
+
+  // Remove a child session from its parent manager's tracking
+  private untrackChildSession(childId: string): void {
+    this.clearChildActivityTimer(childId);
+
+    const child = this.sessions.get(childId);
+    const managerId = child?.info.managedBy;
+    if (!managerId) return;
+
+    const manager = this.sessions.get(managerId);
+    if (!manager?.managerState) return;
+
+    const idx = manager.managerState.childSessionIds.indexOf(childId);
+    if (idx !== -1) {
+      manager.managerState.childSessionIds.splice(idx, 1);
+      manager.info.managerState = manager.managerState;
+      this.emit(managerId, 'session_update', manager.info);
+    }
   }
 
   // Link a child session to its parent manager
@@ -364,6 +406,11 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
+    // Reset activity timer for managed children
+    if (session.info.managedBy) {
+      this.resetChildActivityTimer(sessionId);
+    }
+
     switch (message.type) {
       case 'ready':
         console.log(`[session:${sessionId}] Agent ready`);
@@ -417,6 +464,11 @@ export class SessionManager {
         session.pendingApproval = message.approval;
         this.updateStatus(session, 'awaiting_approval');
         this.emit(sessionId, 'approval_request', message.approval);
+
+        // Forward approval request to parent manager if this is a managed child
+        if (session.info.managedBy) {
+          this.forwardApprovalToManager(sessionId, session, message.approval);
+        }
         break;
 
       case 'question':
@@ -442,9 +494,22 @@ export class SessionManager {
           isError: message.isError,
           contextUsage: message.contextUsage,
         });
-        // Auto-continue for manager sessions
+        // For manager sessions: track turn speed and deliver queued events with backoff
         if (session.info.isManager) {
-          this.scheduleManagerContinue(sessionId);
+          const turnDuration = session.managerLastTurnSentAt > 0
+            ? Date.now() - session.managerLastTurnSentAt
+            : Infinity;
+          const outputTokens = message.contextUsage?.lastTurnOutputTokens ?? Infinity;
+          const isFastTurn = turnDuration < MANAGER_FAST_TURN_THRESHOLD_MS && outputTokens < 50;
+
+          if (isFastTurn) {
+            session.managerConsecutiveFastTurns++;
+            console.log(`[session:${sessionId}] Manager fast turn detected (${turnDuration}ms, ${outputTokens} tokens, streak=${session.managerConsecutiveFastTurns})`);
+          } else {
+            session.managerConsecutiveFastTurns = 0;
+          }
+
+          this.scheduleManagerEventDelivery(sessionId);
         }
         break;
 
@@ -501,7 +566,7 @@ export class SessionManager {
     }
   }
 
-  sendMessage(sessionId: string, content: string): void {
+  sendMessage(sessionId: string, content: string, source?: SessionMessage['source']): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
@@ -518,6 +583,7 @@ export class SessionManager {
       type: 'user',
       content,
       timestamp: new Date().toISOString(),
+      ...(source && { source }),
     });
 
     this.sendToAgent(sessionId, { type: 'user_message', content });
@@ -569,26 +635,61 @@ export class SessionManager {
     session.pendingApproval = null;
     session.pendingQuestion = null;
 
-    // Clear manager auto-continue timer on interrupt
+    // Clear manager timers on interrupt
     if (session.managerContinueTimer) {
       clearTimeout(session.managerContinueTimer);
       session.managerContinueTimer = null;
     }
+    if (session.managerEventBatchTimer) {
+      clearTimeout(session.managerEventBatchTimer);
+      session.managerEventBatchTimer = null;
+    }
+    session.managerConsecutiveFastTurns = 0;
 
     this.sendToAgent(sessionId, { type: 'interrupt' });
   }
 
-  async pauseManager(sessionId: string): Promise<void> {
+  async pauseManager(sessionId: string, resumeAt?: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session || !session.info.isManager || !session.managerState) return;
 
     session.managerState.paused = true;
+
+    // Clear any existing resume timer
+    if (session.managerResumeTimer) {
+      clearTimeout(session.managerResumeTimer);
+      session.managerResumeTimer = null;
+    }
+    session.managerState.resumeAt = undefined;
+
+    // Set up timed auto-resume if requested
+    let resumeMessage = 'Manager session paused. Auto-continue is suspended.';
+    if (resumeAt) {
+      const resumeTime = new Date(resumeAt).getTime();
+      const now = Date.now();
+      const delay = resumeTime - now;
+      const maxDelay = 24 * 60 * 60 * 1000; // 24 hours
+
+      if (delay > 0 && delay <= maxDelay) {
+        session.managerState.resumeAt = resumeAt;
+        session.managerResumeTimer = setTimeout(() => {
+          session.managerResumeTimer = null;
+          this.resumeManager(sessionId);
+        }, delay);
+        resumeMessage = `Manager session paused. Will auto-resume at ${resumeAt}.`;
+      }
+    }
+
     session.info.managerState = session.managerState;
 
-    // Clear any pending auto-continue timer
+    // Clear any pending auto-continue and batch timers
     if (session.managerContinueTimer) {
       clearTimeout(session.managerContinueTimer);
       session.managerContinueTimer = null;
+    }
+    if (session.managerEventBatchTimer) {
+      clearTimeout(session.managerEventBatchTimer);
+      session.managerEventBatchTimer = null;
     }
 
     // If currently running, interrupt the current turn
@@ -605,11 +706,11 @@ export class SessionManager {
       id: uuid(),
       sessionId,
       type: 'system',
-      content: 'Manager session paused. Auto-continue is suspended.',
+      content: resumeMessage,
       timestamp: new Date().toISOString(),
     });
 
-    console.log(`[session:${sessionId}] Manager paused`);
+    console.log(`[session:${sessionId}] Manager paused${session.managerState.resumeAt ? ` (auto-resume at ${session.managerState.resumeAt})` : ''}`);
   }
 
   resumeManager(sessionId: string): void {
@@ -617,7 +718,14 @@ export class SessionManager {
     if (!session || !session.info.isManager || !session.managerState) return;
     if (!session.managerState.paused) return;
 
+    // Clear any pending auto-resume timer
+    if (session.managerResumeTimer) {
+      clearTimeout(session.managerResumeTimer);
+      session.managerResumeTimer = null;
+    }
+
     session.managerState.paused = false;
+    session.managerState.resumeAt = undefined;
     session.info.managerState = session.managerState;
 
     this.emit(sessionId, 'session_update', session.info);
@@ -632,9 +740,10 @@ export class SessionManager {
 
     console.log(`[session:${sessionId}] Manager resumed`);
 
-    // If idle, restart the auto-continue loop immediately
+    // If idle, deliver queued events or fall back to auto-continue
     if (session.info.status === 'idle') {
-      this.scheduleManagerContinue(sessionId);
+      session.managerConsecutiveFastTurns = 0; // reset on explicit resume
+      this.scheduleManagerEventDelivery(sessionId);
     }
   }
 
@@ -697,6 +806,9 @@ export class SessionManager {
       return;
     }
 
+    // Remove from parent manager's tracking before cleanup
+    this.untrackChildSession(sessionId);
+
     const cleanup = async () => {
       // Clear auto-continue timer
       if (session.managerContinueTimer) {
@@ -709,6 +821,21 @@ export class SessionManager {
         session.cancelContainerWatch();
         session.cancelContainerWatch = null;
       }
+
+      // Clear event batch timer
+      if (session.managerEventBatchTimer) {
+        clearTimeout(session.managerEventBatchTimer);
+        session.managerEventBatchTimer = null;
+      }
+
+      // Clear auto-resume timer
+      if (session.managerResumeTimer) {
+        clearTimeout(session.managerResumeTimer);
+        session.managerResumeTimer = null;
+      }
+
+      // Clear child activity timer
+      this.clearChildActivityTimer(sessionId);
 
       // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
       this.updateStatus(session, 'terminated');
@@ -741,6 +868,9 @@ export class SessionManager {
       if (!this.sessions.has(sessionId)) return;
     }
 
+    // Remove from parent manager's tracking before cleanup
+    this.untrackChildSession(sessionId);
+
     const cleanup = async () => {
       // Clear auto-continue timer
       if (session.managerContinueTimer) {
@@ -752,6 +882,12 @@ export class SessionManager {
       if (session.cancelContainerWatch) {
         session.cancelContainerWatch();
         session.cancelContainerWatch = null;
+      }
+
+      // Clear auto-resume timer
+      if (session.managerResumeTimer) {
+        clearTimeout(session.managerResumeTimer);
+        session.managerResumeTimer = null;
       }
 
       // Mark terminated before stopping so the WS disconnect handler doesn't flag as error
@@ -790,14 +926,64 @@ export class SessionManager {
     }
   }
 
+  // Compute delivery delay with exponential backoff based on consecutive fast turns.
+  private getManagerDeliveryDelay(session: ManagedSession): number {
+    const n = session.managerConsecutiveFastTurns;
+    if (n <= 0) return MANAGER_EVENT_BATCH_DELAY_MS;
+    const backoff = MANAGER_EVENT_BATCH_DELAY_MS * Math.pow(2, n - 1);
+    return Math.min(backoff, MANAGER_MAX_BACKOFF_DELAY_MS);
+  }
+
+  // Unified event delivery: batches pending events and delivers them after a debounced delay.
+  private scheduleManagerEventDelivery(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session?.info.isManager || !session.managerState) return;
+
+    // Do not deliver if paused
+    if (session.managerState.paused) return;
+
+    // Debounce: if a batch timer is already running, new events are absorbed into the existing window
+    if (session.managerEventBatchTimer) return;
+
+    const delay = Math.max(MANAGER_EVENT_BATCH_DELAY_MS, this.getManagerDeliveryDelay(session));
+
+    if (session.managerConsecutiveFastTurns > 0) {
+      console.log(`[session:${sessionId}] Manager backoff: ${delay}ms (${session.managerConsecutiveFastTurns} consecutive fast turns)`);
+    }
+
+    session.managerEventBatchTimer = setTimeout(() => {
+      session.managerEventBatchTimer = null;
+      const s = this.sessions.get(sessionId);
+      if (!s || s.info.status !== 'idle' || !s.info.isManager) return;
+      if (s.managerState?.paused) return;
+
+      if (s.pendingManagerEvents.length > 0) {
+        const events = s.pendingManagerEvents.splice(0);
+        const combined = events.join('\n\n---\n\n');
+
+        // Cancel any existing auto-continue timer since we're delivering events directly
+        if (s.managerContinueTimer) {
+          clearTimeout(s.managerContinueTimer);
+          s.managerContinueTimer = null;
+        }
+
+        s.managerLastTurnSentAt = Date.now();
+        this.sendMessage(sessionId, combined, 'child_event');
+      } else {
+        // No events accumulated — fall through to auto-continue
+        this.scheduleManagerContinue(sessionId);
+      }
+    }, delay);
+  }
+
   // Auto-continue logic for manager sessions.
   // When a manager goes idle, ping it after a short delay to keep the loop going.
   private scheduleManagerContinue(sessionId: string): void {
     const session = this.sessions.get(sessionId);
-    if (!session || !session.info.isManager) return;
+    if (!session?.info.isManager || !session.managerState) return;
 
     // Do not schedule if paused
-    if (session.managerState?.paused) return;
+    if (session.managerState.paused) return;
 
     // Clear any existing timer
     if (session.managerContinueTimer) {
@@ -805,6 +991,15 @@ export class SessionManager {
       session.managerContinueTimer = null;
     }
 
+    // If any live children exist, wait for push events instead of auto-continuing.
+    // untrackChildSession() removes terminated children, so any remaining entries are live.
+    const childIds = session.managerState.childSessionIds;
+    if (childIds.length > 0) return;
+
+    // Apply backoff to auto-continue delay too
+    const delay = Math.max(3000, this.getManagerDeliveryDelay(session));
+
+    // No live children (setup phase or all done) — auto-continue
     session.managerContinueTimer = setTimeout(() => {
       session.managerContinueTimer = null;
       const s = this.sessions.get(sessionId);
@@ -818,9 +1013,10 @@ export class SessionManager {
         ? ` Remember: focus on ${prefs.focus === 'bugs' ? 'bugs only' : prefs.focus === 'enhancements' ? 'enhancements only' : 'both bugs and enhancements'}.`
         : '';
 
+      s.managerLastTurnSentAt = Date.now();
       console.log(`[session:${sessionId}] Auto-continuing manager session`);
-      this.sendMessage(sessionId, `Continue your manager loop. Check on child sessions and proceed with the next step.${focusReminder}`);
-    }, 3000);
+      this.sendMessage(sessionId, `Continue your manager loop. Check on child sessions and proceed with the next step.${focusReminder}`, 'auto_continue');
+    }, delay);
   }
 
   private showManagerOnboarding(sessionId: string): void {
@@ -846,7 +1042,16 @@ export class SessionManager {
           header: 'Exploration',
           options: [
             { label: 'Explore', description: 'Run exploration sessions to discover issues before fixing' },
-            { label: 'Skip exploration', description: 'Skip exploration and go straight to fixing existing GitHub issues' },
+            { label: 'Skip exploration', description: 'Skip exploration and go straight to triaging existing GitHub issues' },
+          ],
+          multiSelect: false,
+        },
+        {
+          question: 'Should the manager wait for your approval on plans?',
+          header: 'Plan review',
+          options: [
+            { label: 'Require approval', description: 'Manager pauses after planning and waits for your feedback on each plan' },
+            { label: 'Auto-proceed', description: 'Manager presents plans and continues automatically' },
           ],
           multiSelect: false,
         },
@@ -873,6 +1078,7 @@ export class SessionManager {
 
     const focusAnswer = answers['What should the manager focus on?'] ?? 'Both';
     const explorationAnswer = answers['Should the manager explore the codebase first?'] ?? 'Explore';
+    const planApprovalAnswer = answers['Should the manager wait for your approval on plans?'] ?? 'Auto-proceed';
 
     const focus: ManagerFocus =
       focusAnswer.toLowerCase().includes('bug') ? 'bugs' :
@@ -880,8 +1086,9 @@ export class SessionManager {
       'both';
 
     const skipExploration = explorationAnswer.toLowerCase().includes('skip');
+    const requirePlanApproval = planApprovalAnswer.toLowerCase().includes('require');
 
-    const preferences: ManagerPreferences = { focus, skipExploration };
+    const preferences: ManagerPreferences = { focus, skipExploration, requirePlanApproval };
 
     session.managerState.preferences = preferences;
     session.info.managerState = session.managerState;
@@ -893,29 +1100,144 @@ export class SessionManager {
       id: uuid(),
       sessionId,
       type: 'system',
-      content: `Manager configured: focus=${focus}, exploration=${skipExploration ? 'skip' : 'enabled'}`,
+      content: `Manager configured: focus=${focus}, exploration=${skipExploration ? 'skip' : 'enabled'}, plan approval=${requirePlanApproval ? 'required' : 'auto'}`,
       timestamp: new Date().toISOString(),
     });
 
     const initialMessage = this.buildManagerInitialMessage(preferences);
     setTimeout(() => {
-      this.sendMessage(sessionId, initialMessage);
+      this.sendMessage(sessionId, initialMessage, 'auto_continue');
     }, 500);
   }
 
   private buildManagerInitialMessage(preferences: ManagerPreferences): string {
-    const { focus, skipExploration } = preferences;
+    const { focus, skipExploration, requirePlanApproval } = preferences;
 
     const focusDescription =
       focus === 'bugs' ? 'bugs and code quality issues' :
       focus === 'enhancements' ? 'enhancements and improvements' :
       'bugs and enhancements';
 
+    const planApprovalNote = requirePlanApproval
+      ? ' Plan approval is REQUIRED — after planning and review, STOP and wait for user feedback on each plan before proceeding to fixing.'
+      : ' Plan approval is NOT required — after plans pass review, proceed to fixing automatically.';
+
     if (skipExploration) {
-      return `Begin your independent manager loop. Skip exploration — go directly to Step 2 (Fix). Look at existing GitHub issues with \`gh issue list\` and focus on ${focusDescription}. Triage the issues, then create fix sessions for each group.`;
+      return `Begin your independent manager loop. Skip exploration — go directly to Step 2 (Triage). Focus on ${focusDescription}.${planApprovalNote}`;
     }
 
-    return `Begin your independent manager loop. Start with Step 1: create exploration sessions to find ${focusDescription} in this repository. Track all findings as GitHub issues.`;
+    return `Begin your independent manager loop. Start with Step 1: create exploration sessions to find ${focusDescription} in this repository. Track all findings as GitHub issues.${planApprovalNote}`;
+  }
+
+  // --- Push-based manager event delivery ---
+
+  private forwardApprovalToManager(childId: string, child: ManagedSession, approval: PendingApproval): void {
+    const managerId = child.info.managedBy;
+    if (!managerId) return;
+    const manager = this.sessions.get(managerId);
+    if (!manager?.info.isManager || manager.managerState?.paused) return;
+
+    // Format tool input — truncate large payloads (Write/Edit file contents)
+    const inputStr = JSON.stringify(approval.toolInput, null, 2);
+    const truncatedInput = inputStr.length > 1000
+      ? inputStr.slice(0, 1000) + '\n...(truncated)'
+      : inputStr;
+
+    const reasonBlock = approval.reason
+      ? `\nChild's reasoning:\n${approval.reason.slice(0, 500)}\n`
+      : '';
+
+    const message = `[CHILD APPROVAL REQUEST]
+Session: "${child.info.name}" (ID: ${childId})
+Tool: ${approval.toolName}
+Input:
+${truncatedInput}
+${reasonBlock}
+Review the tool request and the child's reasoning. Approve if on-track, deny with guidance if off-track.
+
+Approval ID: ${approval.id}`;
+
+    this.deliverOrQueueManagerEvent(managerId, manager, message);
+  }
+
+  private notifyManagerOfChildStatus(
+    childId: string, child: ManagedSession,
+    previousStatus: SessionStatus, newStatus: SessionStatus
+  ): void {
+    // Clear stale timer on terminal transitions — these generate their own events
+    if (newStatus === 'idle' || newStatus === 'error' || newStatus === 'terminated') {
+      this.clearChildActivityTimer(childId);
+    }
+
+    const managerId = child.info.managedBy;
+    if (!managerId) return;
+    const manager = this.sessions.get(managerId);
+    if (!manager?.info.isManager || manager.managerState?.paused) return;
+
+    let message: string | null = null;
+
+    if (previousStatus === 'starting' && newStatus === 'idle') {
+      message = `[CHILD SESSION READY]\nSession: "${child.info.name}" (ID: ${childId})\nThe session is ready. Send it its instructions via POST /api/sessions/${childId}/message.`;
+    } else if (previousStatus === 'running' && newStatus === 'idle') {
+      const resultSummary = this.getChildResultSummary(childId);
+      message = `[CHILD SESSION COMPLETED]\nSession: "${child.info.name}" (ID: ${childId})\nThe session has finished its work.\n\n--- Child Output ---\n${resultSummary}\n--- End Child Output ---\n\nDecide next steps based on the output above.`;
+    } else if (newStatus === 'error') {
+      message = `[CHILD SESSION ERROR]\nSession: "${child.info.name}" (ID: ${childId})\nThe session encountered an error. Read its messages to investigate.`;
+    }
+
+    if (message) this.deliverOrQueueManagerEvent(managerId, manager, message);
+  }
+
+  // Extract assistant messages from a child session for inline delivery.
+  private getChildResultSummary(childId: string): string {
+    const child = this.sessions.get(childId);
+    if (!child) return '(session not found)';
+
+    const parts = child.messages
+      .filter(m => m.type === 'assistant')
+      .map(m => m.content);
+
+    return parts.length > 0 ? parts.join('\n\n') : '(no output captured)';
+  }
+
+  private resetChildActivityTimer(childId: string): void {
+    this.clearChildActivityTimer(childId);
+
+    const child = this.sessions.get(childId);
+    const managerId = child?.info.managedBy;
+    if (!managerId) return;
+
+    // Don't start a timer for terminal states — those produce their own events
+    const { status } = child.info;
+    if (status === 'terminated' || status === 'error') return;
+
+    const timer = setTimeout(() => {
+      this.childActivityTimers.delete(childId);
+
+      const c = this.sessions.get(childId);
+      const m = managerId ? this.sessions.get(managerId) : undefined;
+      if (!c || !m?.info.isManager || m.managerState?.paused) return;
+
+      const message = `[CHILD SESSION STALE]\nSession: "${c.info.name}" (ID: ${childId})\nNo activity from this session for 30 seconds. Check on its progress and determine if it needs help.`;
+      this.deliverOrQueueManagerEvent(managerId, m, message);
+    }, CHILD_ACTIVITY_TIMEOUT_MS);
+
+    this.childActivityTimers.set(childId, timer);
+  }
+
+  private clearChildActivityTimer(childId: string): void {
+    const timer = this.childActivityTimers.get(childId);
+    if (timer) {
+      clearTimeout(timer);
+      this.childActivityTimers.delete(childId);
+    }
+  }
+
+  private deliverOrQueueManagerEvent(managerId: string, manager: ManagedSession, message: string): void {
+    manager.pendingManagerEvents.push(message);
+    if (manager.info.status === 'idle') {
+      this.scheduleManagerEventDelivery(managerId);
+    }
   }
 
   // --- Persistence ---
@@ -1018,9 +1340,15 @@ export class SessionManager {
   }
 
   private updateStatus(session: ManagedSession, status: SessionStatus): void {
+    const previousStatus = session.info.status;
     session.info.status = status;
     this.emit(session.info.id, 'session_update', session.info);
     this.schedulePersist();
+
+    // Notify parent manager of significant child status transitions
+    if (session.info.managedBy && previousStatus !== status) {
+      this.notifyManagerOfChildStatus(session.info.id, session, previousStatus, status);
+    }
   }
 
   private addMessage(session: ManagedSession, message: SessionMessage): void {

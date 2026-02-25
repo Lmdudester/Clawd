@@ -4,6 +4,10 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useNavigate } from 'react-router-dom';
 import type { ProjectRepo } from '@clawd/shared';
 
+function repoShortName(url: string): string {
+  return url.split('/').filter(Boolean).pop()?.replace(/\.git$/, '') || '';
+}
+
 export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [name, setName] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
@@ -141,6 +145,9 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
     setRepoUrl(repos[index].url);
     setBranch(repos[index].defaultBranch);
     fetchBranches(repos[index].url, repos[index].defaultBranch);
+    if (managerMode && (!name.trim() || name.endsWith(' Manager'))) {
+      setName(`${repoShortName(repos[index].url)} Manager`);
+    }
   }
 
   function handleBranchChange(value: string) {
@@ -338,7 +345,13 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
             <input
               type="checkbox"
               checked={managerMode}
-              onChange={(e) => setManagerMode(e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setManagerMode(checked);
+                if (checked && !name.trim() && repoUrl) {
+                  setName(`${repoShortName(repoUrl)} Manager`);
+                }
+              }}
               className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
             />
             <div>

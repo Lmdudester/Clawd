@@ -10,9 +10,13 @@ interface Props {
   isInterruptible?: boolean;
   onInterrupt?: () => void;
   sessionId?: string;
+  showManagerControls?: boolean;
+  isManagerPaused?: boolean;
+  onPauseManager?: () => void;
+  onResumeManager?: () => void;
 }
 
-export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt, sessionId }: Props) {
+export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt, sessionId, showManagerControls, isManagerPaused, onPauseManager, onResumeManager }: Props) {
   const setDraftMessage = useSessionStore((s) => s.setDraftMessage);
   const initialDraft = useSessionStore((s) => sessionId ? s.draftMessages.get(sessionId) ?? '' : '');
   const [value, setValue] = useState(initialDraft);
@@ -149,6 +153,33 @@ export function MessageInput({ onSend, disabled, isInterruptible, onInterrupt, s
         className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none text-base"
         data-testid="message-input"
       />
+      {showManagerControls && (
+        <button
+          onClick={isManagerPaused ? onResumeManager : onPauseManager}
+          className={`px-4 py-2.5 rounded-xl font-medium transition-colors shrink-0 flex items-center gap-1.5 ${
+            isManagerPaused
+              ? 'bg-green-600 hover:bg-green-700 active:bg-green-800 text-white'
+              : 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white'
+          }`}
+          title={isManagerPaused ? 'Resume manager auto-continue' : 'Pause manager auto-continue'}
+        >
+          {isManagerPaused ? (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+                <path d="M3 3.732a1.5 1.5 0 0 1 2.305-1.265l6.706 4.267a1.5 1.5 0 0 1 0 2.531l-6.706 4.268A1.5 1.5 0 0 1 3 12.267V3.732Z" />
+              </svg>
+              Resume
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+                <path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5Zm5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5Z" />
+              </svg>
+              Pause
+            </>
+          )}
+        </button>
+      )}
       {isInterruptible && (
         <button
           onClick={onInterrupt}

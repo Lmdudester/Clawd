@@ -11,13 +11,13 @@ function sanitizeSessionName(name: string): string | null {
 }
 
 /** Check if the authenticated user owns the session (or is the managing manager). */
-function isSessionOwner(req: AuthRequest, session: { info: { createdBy: string; managedBy?: string } }, sessionManager: SessionManager): boolean {
+function isSessionOwner(req: AuthRequest, session: { info: { id: string; createdBy: string; managedBy?: string } }, sessionManager: SessionManager): boolean {
   if (req.managerApiToken) {
     // Resolve which manager session this token belongs to
     const managerId = sessionManager.findManagerByToken(req.managerApiToken);
     if (!managerId) return false;
-    // Check: is the target session managed by this manager?
-    return session.info.managedBy === managerId;
+    // Allow if: target is this manager itself, or a child managed by it
+    return session.info.id === managerId || session.info.managedBy === managerId;
   }
   return req.user?.username === session.info.createdBy;
 }
@@ -37,7 +37,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
 
   // Create a new session
   router.post('/', async (req: AuthRequest, res) => {
-    const { name, repoUrl, branch, dockerAccess, managerMode } = req.body as CreateSessionRequest;
+    const { name, repoUrl, branch, dockerAccess, managerMode, permissionMode } = req.body as CreateSessionRequest;
 
     const sanitizedName = name ? sanitizeSessionName(name) : null;
     if (!sanitizedName || !repoUrl || !branch) {
@@ -59,15 +59,27 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     }
 
     try {
-      const createdBy = req.user?.username ?? 'unknown';
-      const session = await sessionManager.createSession(sanitizedName, repoUrl, branch, !!dockerAccess, !!managerMode, createdBy);
-
-      // Auto-link child to parent manager if created via manager API token
+      // When created by a manager, inherit the manager's owner so children
+      // appear in the same user's session list.
+      let createdBy = req.user?.username ?? 'unknown';
+      let managerId: string | null = null;
       if (req.managerApiToken) {
-        const managerId = sessionManager.findManagerByToken(req.managerApiToken);
+        managerId = sessionManager.findManagerByToken(req.managerApiToken);
         if (managerId) {
-          sessionManager.trackChildSession(managerId, session.id);
+          const manager = sessionManager.getSession(managerId);
+          if (manager) createdBy = manager.info.createdBy;
         }
+      }
+
+      // Validate and pass permission mode directly so it's set before the container starts
+      const validatedMode = permissionMode && ['normal', 'auto_edits', 'dangerous', 'plan'].includes(permissionMode)
+        ? permissionMode as import('@clawd/shared').PermissionMode
+        : undefined;
+      const session = await sessionManager.createSession(sanitizedName, repoUrl, branch, !!dockerAccess, !!managerMode, createdBy, validatedMode);
+
+      // Auto-link child to parent manager
+      if (managerId) {
+        sessionManager.trackChildSession(managerId, session.id);
       }
 
       res.status(201).json({ session });
@@ -179,7 +191,7 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     }
 
     const { step } = req.body as UpdateManagerStepRequest;
-    const validSteps: ManagerStep[] = ['idle', 'exploring', 'fixing', 'testing', 'merging'];
+    const validSteps: ManagerStep[] = ['idle', 'exploring', 'triaging', 'planning', 'reviewing', 'fixing', 'testing', 'merging'];
     if (!step || !validSteps.includes(step)) {
       res.status(400).json({ error: `Invalid step. Must be one of: ${validSteps.join(', ')}` });
       return;
@@ -209,6 +221,45 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
     }
 
     sessionManager.approveToolUse(id, approvalId, allow, message);
+    res.json({ ok: true });
+  });
+
+  // Interrupt a running session (stop its current turn)
+  router.post('/:id/interrupt', async (req: AuthRequest, res) => {
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session, sessionManager)) {
+      res.status(403).json({ error: 'Not authorized for this session' });
+      return;
+    }
+
+    await sessionManager.interruptSession(id);
+    res.json({ ok: true });
+  });
+
+  // Pause a manager session (allows the manager to pause itself via API)
+  router.post('/:id/pause', async (req: AuthRequest, res) => {
+    const id = req.params.id as string;
+    const session = sessionManager.getSession(id);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (!isSessionOwner(req, session, sessionManager)) {
+      res.status(403).json({ error: 'Not authorized for this session' });
+      return;
+    }
+    if (!session.info.isManager) {
+      res.status(400).json({ error: 'Not a manager session' });
+      return;
+    }
+
+    const { resumeAt } = req.body ?? {};
+    await sessionManager.pauseManager(id, resumeAt);
     res.json({ ok: true });
   });
 

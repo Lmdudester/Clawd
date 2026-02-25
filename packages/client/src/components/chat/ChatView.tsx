@@ -133,7 +133,7 @@ export function ChatView() {
   );
 
   const isInputDisabled = session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer' || session?.status === 'terminated' || session?.status === 'starting' || session?.status === 'error' || session?.status === 'reconnecting';
-  const isInterruptible = session?.status === 'running' || session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer';
+  const isInterruptible = (session?.status === 'running' || session?.status === 'awaiting_approval' || session?.status === 'awaiting_answer') && !(session?.isManager && !session?.managerState?.paused);
   const isManagerPaused = !!session?.isManager && !!session?.managerState?.paused;
 
   if (sessionNotFound) {
@@ -169,43 +169,6 @@ export function ChatView() {
           )}
           {session?.managedBy && (
             <span className="inline-block text-xs font-semibold text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0">Managed</span>
-          )}
-          {session?.managerState && (
-            <span className="inline-block text-xs font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded mr-2 shrink-0 capitalize">
-              {session.managerState.currentStep}
-            </span>
-          )}
-          {session?.managerState && session.managerState.childSessionIds.length > 0 && (
-            <span className="inline-block text-xs text-slate-400 mr-2 shrink-0">
-              {session.managerState.childSessionIds.length} child{session.managerState.childSessionIds.length !== 1 ? 'ren' : ''}
-            </span>
-          )}
-          {session?.isManager && session?.status !== 'terminated' && session?.status !== 'error' && (
-            <button
-              onClick={isManagerPaused ? handleResumeManager : handlePauseManager}
-              className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded border transition-colors mr-2 shrink-0 ${
-                isManagerPaused
-                  ? 'text-green-300 bg-green-500/20 border-green-500/30 hover:bg-green-500/30'
-                  : 'text-amber-300 bg-amber-500/20 border-amber-500/30 hover:bg-amber-500/30'
-              }`}
-              title={isManagerPaused ? 'Resume manager auto-continue' : 'Pause manager auto-continue'}
-            >
-              {isManagerPaused ? (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
-                    <path d="M3 3.732a1.5 1.5 0 0 1 2.305-1.265l6.706 4.267a1.5 1.5 0 0 1 0 2.531l-6.706 4.268A1.5 1.5 0 0 1 3 12.267V3.732Z" />
-                  </svg>
-                  Resume
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
-                    <path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5Zm5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5Z" />
-                  </svg>
-                  Pause
-                </>
-              )}
-            </button>
           )}
           <h1 className="text-lg font-medium text-white truncate">{session?.name ?? 'Session'}</h1>
         </div>
@@ -260,10 +223,19 @@ export function ChatView() {
           isManagerPaused
             ? 'bg-amber-500/10 border-t border-amber-500/20 text-amber-300'
             : 'bg-purple-500/10 border-t border-purple-500/20 text-purple-300'
-        } text-xs font-medium text-center shrink-0`}>
-          {isManagerPaused
-            ? 'Manager session paused — auto-continue is suspended'
-            : 'Autonomous manager session — messages will guide the orchestration loop'}
+        } text-xs font-medium shrink-0 flex items-center justify-center gap-3`}>
+          {session.managerState && (
+            <span className="font-semibold capitalize">
+              {session.managerState.currentStep}
+            </span>
+          )}
+          <span className="text-slate-500">·</span>
+          <span>Manager{isManagerPaused ? ' · Paused' : ''}</span>
+          {session.managerState && session.managerState.childSessionIds.length > 0 && (
+            <><span className="text-slate-500">·</span><span className="text-slate-400">
+              {session.managerState.childSessionIds.length} child{session.managerState.childSessionIds.length !== 1 ? 'ren' : ''}
+            </span></>
+          )}
         </div>
       )}
 
@@ -273,7 +245,7 @@ export function ChatView() {
       ) : pendingQuestion && session?.status === 'awaiting_answer' ? (
         <QuestionPanel question={pendingQuestion} onAnswer={handleAnswer} onInterrupt={handleInterrupt} />
       ) : (
-        <MessageInput onSend={handleSend} disabled={isInputDisabled} isInterruptible={isInterruptible} onInterrupt={handleInterrupt} sessionId={id} />
+        <MessageInput onSend={handleSend} disabled={isInputDisabled} isInterruptible={isInterruptible} onInterrupt={handleInterrupt} sessionId={id} isManagerPaused={isManagerPaused} onPauseManager={handlePauseManager} onResumeManager={handleResumeManager} showManagerControls={!!session?.isManager && session?.status !== 'terminated' && session?.status !== 'error'} />
       )}
 
       {session && (

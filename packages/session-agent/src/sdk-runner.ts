@@ -35,14 +35,78 @@ const READONLY_BASH_PATTERNS = [
   /^gh\s+release\s+(list|view)\b/,
   /^gh\s+run\s+(list|view)\b/,
   /^gh\s+workflow\s+(list|view)\b/,
-  /^gh\s+api\s/,          // gh api (GET by default)
-  /^gh\s+search\s/,       // gh search repos/issues/prs/commits
+  /^gh\s+api\s/,
+  /^gh\s+search\s/,
   /^gh\s+status\b/,
-  // General-purpose safe commands
+  // Git read-only subcommands
+  /^git\s+(log|status|diff|show|branch|tag|remote|stash\s+list|rev-parse|ls-files|ls-tree|shortlog|blame|reflog)\b/,
+  // General-purpose read commands
   /^sleep\s/,
   /^curl\s/,
   /^head\b/,
   /^tail\b/,
+  /^cat\b/,
+  /^ls\b/,
+  /^pwd\b/,
+  /^echo\b/,
+  /^printf\b/,
+  /^tree\b/,
+  /^find\b/,
+  /^which\b/,
+  /^whoami\b/,
+  /^env\b/,
+  /^printenv\b/,
+  /^date\b/,
+  /^uname\b/,
+  /^id\b/,
+  /^file\b/,
+  /^stat\b/,
+  /^du\b/,
+  /^df\b/,
+  /^wc\b/,
+  /^diff\b/,
+  /^realpath\b/,
+  /^basename\b/,
+  /^dirname\b/,
+  // Data-processing / pipe targets
+  /^jq\b/,
+  /^grep\b/,
+  /^rg\b/,
+  /^awk\b/,
+  /^sed\b/,
+  /^cut\b/,
+  /^sort\b/,
+  /^uniq\b/,
+  /^tr\b/,
+  /^column\b/,
+  /^less\b/,
+  /^more\b/,
+  /^rev\b/,
+  /^tac\b/,
+  /^nl\b/,
+  /^fold\b/,
+  /^paste\b/,
+  /^expand\b/,
+  /^unexpand\b/,
+  /^comm\b/,
+  /^join\b/,
+  /^md5sum\b/,
+  /^sha256sum\b/,
+  /^base64\b/,
+  /^xxd\b/,
+  /^od\b/,
+  /^hexdump\b/,
+  // npm/node read-only
+  /^npm\s+(ls|list|outdated|view|info|explain|why|audit|pack\s+--dry-run)\b/,
+  /^npx\s+tsc\s+--noEmit\b/,
+  /^node\s+-e\b/,
+  /^node\s+--eval\b/,
+  // Build & test (npm/npx/node)
+  /^npm\s+(run\s+)?(build|test|typecheck|lint|check)\b/,
+  /^npx\s+tsc\b/,
+  /^npx\s+(vitest|jest|mocha|eslint|prettier\s+--check)\b/,
+  // Python read-only
+  /^python3?\s+-c\b/,
 ];
 
 // Curl flags that perform writes, uploads, or output to files — deny these
@@ -68,6 +132,12 @@ export function isReadOnlyBash(toolName: string, input: Record<string, unknown>)
     if (/^gh\s+api\s/.test(sub) && /(?:--method[=\s]\s*|-X\s*)(?!GET\b)[A-Z]/i.test(sub)) return false;
     // Reject curl with dangerous flags (POST, upload, output to file, etc.)
     if (/^curl\s/.test(sub) && DANGEROUS_CURL_FLAGS.test(sub)) return false;
+    // Reject find with -exec, -execdir, or -delete (can mutate filesystem)
+    if (/^find\b/.test(sub) && /-(exec|execdir|delete)\b/.test(sub)) return false;
+    // Reject sed with -i (in-place edit)
+    if (/^sed\b/.test(sub) && /(?:^|\s)-i\b/.test(sub)) return false;
+    // Reject sort with -o (writes to file)
+    if (/^sort\b/.test(sub) && /(?:^|\s)-o\b/.test(sub)) return false;
     if (!READONLY_BASH_PATTERNS.some(p => p.test(sub))) return false;
   }
 
@@ -104,6 +174,7 @@ export class SDKRunner {
   private config?: ClawdConfig;
   private managerMode: boolean;
   private hasAssistantMessage = false;
+  private lastAssistantReasoning = '';
 
   // Cumulative context tracking
   private cumulativeInputTokens = 0;
@@ -382,10 +453,12 @@ export class SDKRunner {
       }
 
       // Build system prompt
+      const hasDocker = !!process.env.DOCKER_HOST;
       const appendText = this.managerMode
         ? buildManagerPrompt()
         : [
             'You are running inside a Clawd session container.',
+            ...(hasDocker ? ['Docker is available in this session — you can use `docker` commands to build images, run containers, and host services.'] : []),
             'IMPORTANT: Do not explore or read source files unless the task specifically requires understanding the code.',
             'This project\'s CLAUDE.md already gives you the architecture and key paths — trust it instead of reading files to orient yourself.',
             'When a skill provides step-by-step instructions, follow them immediately without any preliminary exploration.',
@@ -563,6 +636,7 @@ export class SDKRunner {
       id: approvalId,
       toolName,
       toolInput: input,
+      reason: this.lastAssistantReasoning || undefined,
       timestamp: new Date().toISOString(),
     };
 
@@ -665,8 +739,11 @@ export class SDKRunner {
           (b: any) => b.type === 'tool_use'
         );
 
+        // Reset reasoning for this assistant turn, then accumulate text blocks
+        this.lastAssistantReasoning = '';
         for (const block of textBlocks) {
           if ((block as any).text) {
+            this.lastAssistantReasoning += (block as any).text;
             this.hasAssistantMessage = true;
             this.masterClient.send({
               type: 'sdk_message',
